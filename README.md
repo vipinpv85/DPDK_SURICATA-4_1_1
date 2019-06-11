@@ -16,4 +16,6 @@ integerate dpdk PMD to suricata read method under worker mode
 
 ## How To?
 
-DPDK version: dpdk-stable-18.11.1
+### version: 
+ - DPDK: dpdk-stable-18.11.1
+ - Suricata: suricata-4.1.4
