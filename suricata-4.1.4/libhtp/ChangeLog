@@ -1,0 +1,306 @@
+0.5.30 (07 March 2019)
+----------------------
+
+- array/list handing optimization by Philippe Antoine for an issue found be oss-fuzz
+
+- improved Windows support
+
+- fuzz targets improvements by Philippe Antoine
+
+- packaging improvements by Fabrice Fontaine
+
+- install doc improved by Wenhui Zhang
+
+0.5.29 (21 December 2018)
+-------------------------
+
+- prepare for oss-fuzz integration, by Philippe Antoine
+
+- fix undefined behavior signed int overflow
+
+- make status code parsing more robust
+
+0.5.28 (5 November 2018)
+------------------------
+
+- Fix potential memory leaks
+
+- Fix string truncation compile warning
+
+0.5.27 (18 July 2018)
+---------------------
+
+- Folded header field can be parsed as separate if there are no data available to peek into [#159]
+
+- libhtp crash at deal multiple decompression [#158]
+
+- Fix configure flag handling
+
+- Fix auth/digist header parsing out of bounds read
+
+0.5.26 (13 February 2018)
+-------------------------
+
+- allow missing requests [#128, #163]
+
+- fix memory leak when response line is body [#161]
+
+- fix build on MinGW [#162]
+
+- fix gcc7 compiler warnings [#157]
+
+0.5.25 (28 June 2017)
+---------------------
+
+- underscore in htp_validate_hostname [#149]
+
+- fix SONAME issue [#151]
+
+- remove unrelated docbook code from tree [#153]
+
+0.5.24 (07 June 2017)
+---------------------
+
+- fix HTTP connect handling issue [#150]
+
+0.5.23 (01 November 2016)
+--------------------------
+
+- enable -fPIC by default if supported and enable stack protection options on *BSD [#145]
+
+0.5.22 (06 September 2016)
+--------------------------
+
+- on "101 Switching Protocols", treat connection as a tunnel [#141]
+
+-  Fix warning on OS X. [#142]
+
+0.5.21 (13 July 2016)
+---------------------
+
+- compression: fixed 'response_decompression_enabled' being
+  ignored in case of multiple encodings [#140]
+
+0.5.20 (7 June 2016)
+--------------------
+
+- compression: support multiple layers of compressed content [#133]
+
+- compression: opportunistic decompression [#137]
+
+- compression: implement rfc1950 deflate [#136]
+
+- chunked: handle mismatch between header and body [#135]
+
+- chunked: handle malformed chunked lengths [#134]
+
+0.5.19 (22 March 2016)
+----------------------
+
+- configure: improve strlcpy/strlcat checks [Victor Julien]
+
+- Fix uninitialized htp_tx_t::is_last value in htp_decompressors.c [Fedor Sakharov]
+
+- headers: fix memory leak on malformed headers [Victor Julien]
+
+- connect: handle response headers with 200 response [Victor Julien]
+
+0.5.18 (25 September 2015)
+--------------------------
+
+- Fixed [#120] Trigger request line parsing on
+  incomplete request [Victor Julien]
+
+- Fixed [#119] Fix uninitialized htp_tx_t::is_last value
+  in in htp_tx_res_process_body_data_ex() [Fedor Sakharov]
+
+- Fixed [#118] Coverity-identified missing break in switch [Sam Baskinger]
+
+- Fixed [#117] Coverity-identified issue of not checking
+  malloc() return value [Sam Baskinger]
+
+- Fixed [#116] Fix coverity-identified leaked file descriptors
+  in unit test [Sam Baskinger]
+
+- Fixed [#113] fix pkgconfig include dir [Eric Leblond]
+
+- Fixed [#111] Connect plain http [Victor Julien]
+
+- Fixed [#105] Do not invoke callbacks in htp_req_run_hook_body_data()
+  when there is no tx running. [Sam Baskinger]
+
+- Fixed [#104] Modifiying HTTP methods to be rfc3253 compliant [Andreas Moe]
+
+- Fixed [#103] Fixes [Victor Julien]
+
+- Fixed [#101] Make including the autoconf config header safer [Brian Rectanus]
+
+0.5.17 (25 February 2015)
+-------------------------
+
+- Fix URI parsing for non-std 'space' chars
+  [Fixed by Victor Julien / Reported by Darien Huss from Emerging Threats]
+
+- Fixing buffer overrun that was failing clang
+  -fsanitize=address checks [Sam Baskinger]
+
+- Replace strcat/sprintf by strlcat/snprintf [Giuseppe Longo]
+
+- Fix autogen on CentOS 5.11 [Victor Julien]
+
+- Fix dereferencing type-punned pointer on CentOS 5.11 [Giuseppe Longo]
+
+- Fix warning on OpenBSD [Giuseppe Longo]
+
+
+0.5.16 (11 December 2014)
+-------------------------
+
+- Per personality requestline leading whitespace handling [Victor Julien]
+
+- Improve request line parsing with leading spaces [Victor Julien]
+
+- Harden decompress code against memory stress [Victor Julien]
+
+
+0.5.15 (1 August 2014)
+----------------------
+
+- Fixed [#78] Make a case-insensitive comparision for the pattern "chunked"
+  for "Transfer-Encoding" [Anoop Saldanha]
+
+
+0.5.14 (22 July 2014)
+---------------------
+
+- Fixed the tests sometimes not returning the correct status code. Increased the
+  the compiler warnings for the tests.
+
+- Fixed [#77] Fix compiler warnings in the tests
+
+
+0.5.13 (16 July 2014)
+---------------------
+
+- Fixed [#56] Investigate clean-up performance with a large number of transactions
+  on a single connection
+
+
+0.5.12 (25 June 2014)
+---------------------
+
+- Fixed [#73] Fix double Content-Length issue [Wesley Shields]
+
+
+0.5.11 (5 April 2014)
+---------------------
+
+- Fixed [#72] On CONNECT requests inbound tx progress prematurely set to complete
+
+- Fixed [#71] Fix missing files in distribution target [Pierre Chifflier]
+
+
+0.5.10 (3 March 2014)
+--------------------
+
+- Fixed [#63] Final response body data callback missing on compressed responses.
+
+- Do not consume the byte that comes after an invalid UTF-8 character.
+
+- Use case insensitive comparison for content-coding values. Warn if unknown
+  response content encoding is encountered.
+
+- Small fixes. [#66, #69] [Victor Julien]
+
+
+0.5.9 (19 November 2013)
+------------------------
+
+- Fixed an HTP_HOST_AMBIGUOUS false positive.
+
+- Fixed the tests not compiling on OS X 10.9.
+
+
+0.5.8 (21 October 2013)
+-----------------------
+
+- Fixed [#54] Compression and base64 tests failing on some architectures.
+
+- Fixed [#55] Incorrect ambiguous host warning on some CONNECT requests.
+
+
+0.5.7 (18 September 2013)
+-------------------------
+
+- Use umask() with mkstemp() to ensure that temporary files are created with correct
+  permissions. This addresses the potential security problem, but creates another, because
+  umask() is not thread safe. For this and other reasons (see #52), file extraction will be
+  removed in a future release.
+
+- Fix copying hook_response_complete instead of hook_transaction_complete.
+
+- Fix several small memory leaks that occur when memory allocation fails.
+
+
+0.5.6 (22 July 2013)
+-------------------
+
+- Fix memory leaks in htp_tx_t::request_auth_username and htp_tx_t::request_auth_password.
+
+- [#43] When processing the response line, treat stream closure as the end of line.
+
+- Fix normalization when the URL begins with "./".
+
+- Do not fail a stream with an incorrectly formed digest username.
+
+- Do not stop processing request headers on PUT requests.
+
+
+0.5.5 (18 July 2013)
+--------------------
+
+- Tagging for a Suricata beta release.
+
+- [#46] Fix the segfault that occurs under certain conditions when an invalid hostname is supplied.
+
+- [#44] Fix libiconv detection on OpenBSD. [Victor Julien]
+
+
+0.5.4 (17 July 2013)
+--------------------
+
+- Tagging for a Suricata beta release.
+
+- Added htp_get_version(), which returns the complete library name (e.g., "LibHTP v0.5.4").
+
+- Hard field limit is now treated as specifying the maximum amount of memory LibHTP
+  will use for buffering per stream. Fields (e.g., headers) longer than this limit
+  will be accepted if they are contained within a single buffer submitted to LibHTP (i.e.,
+  if LibHTP does not have to do any buffering in order to process them). Soft limits
+  are currently not creating any warnings. This area will be improved in a future release.
+
+- Invalid headers no longer fail the entire stream. They are now treated as
+  headers without a name.
+
+- htp_conn_remove_tx() now returns HTP_DECLINED (was HTTP_ERROR) if the
+  specified transaction cannot be found.
+
+- htp_list_array_replace() now returns HTP_DECLINED (was HTP_ERROR) if the element at the
+  specified position does not exist.
+
+- New public functions:
+
+  htp_status_t htp_urldecode_inplace(htp_cfg_t *cfg, enum htp_decoder_ctx_t ctx, bstr *input, uint64_t *flags);
+  htp_status_t htp_urldecode_inplace_ex(htp_cfg_t *cfg, enum htp_decoder_ctx_t ctx, bstr *input, uint64_t *flags, int *expected_status_code);
+
+- Improved test coverage (84.1% lines, 91.3% functions).
+
+
+0.5.3 (14 June 2013)
+--------------------
+
+- Fix stream error when valid Basic Authentication information is provided.
+
+- Do not fail the entire stream if the Authorization header is invalid. Raise HTP_AUTH_INVALID instead.
+
+- When a request does not contain the request URI, leave htp_tx_t::request_uri NULL.

@@ -1,0 +1,1436 @@
+4.1.4 -- 2019-04-30
+
+Bug #2870: pcap logging with lz4 coverity warning
+Bug #2883: ssh: heap buffer overflow
+Bug #2884: mpls: heapbuffer overflow in file decode-mpls.c
+Bug #2887: decode-ethernet: heapbuffer overflow in file decode-ethernet.c
+Bug #2888: 4.1.3 core in HCBDCreateSpace
+Bug #2894: smb 1 create andx request does not parse the filename correctly
+Bug #2902: rust/dhcp: panic in dhcp parser
+Bug #2903: mpls: cast of misaligned data leads to undefined behvaviour
+Bug #2904: rust/ftp: panic in ftp parser
+Bug #2943: rust/nfs: integer underflow
+
+4.1.3 -- 2019-03-07
+
+Bug #2225: when stats info dumping in redis,the decoder.ipv4.trunc_pkt can't output.In the same time, in the stats.log this can output
+Bug #2362: rule reload with workers mode and NFQUEUE not working stable
+Bug #2761: Include ebpf files in distributed sources
+Bug #2762: SSLv3 - AddressSanitizer heap-buffer-overflow
+Bug #2770: TCP FIN/ACK, RST/ACK in HTTP - detection bypass
+Bug #2788: afpacket doesn't wait for all capture threads to start
+Bug #2805: dns v1/2 with rust results in less app layer data available in the alert record (for dns related alerts/rules) (4.1.x)
+Bug #2811: netmap/afpacket IPS: stream.inline: auto broken
+Bug #2823: configure.ac: broken --{enable,disable}-xxx options (4.1.x)
+Bug #2842: IPS mode crash under load
+Bug #2855: Suricata does not bridge host <-> hw rings (Affects FreeBSD 11-STABLE, FreeBSD 12 and FreeBSD 13-CURRENT)
+Bug #2862: pcre related FP in HTTP inspection (4.1.x)
+Bug #2865: Suricata rule sid:2224005 SURICATA IKEv2 weak cryptographic parameters (Diffie-Hellman) not works (4.1.x)
+Feature #2774: pcap multi dev support for Windows
+
+4.1.2 -- 2018-12-21
+
+Feature #1863: smtp: improve pipelining support
+Feature #2748: bundle libhtp 0.5.29
+Feature #2749: bundle suricata-update 1.0.3
+Bug #2682: python-yaml Not Listed As Ubuntu Prerequisite
+Bug #2736: DNS Golden Transaction ID - detection bypass
+Bug #2745: Invalid detect-engine config could lead to segfault
+Bug #2752: smb: logs for IOCTL and DCERPC have tree_id value of 0
+
+4.1.1 -- 2018-12-17
+
+Feature #2637: af-packet: improve error output for BPF loading failure
+Feature #2671: Add Log level to suricata.log when using JSON type
+Bug #2502: suricata.c ConfigGetCaptureValue - PCAP/AFP fallthrough to strip_trailing_plus
+Bug #2528: krb parser not always parsing tgs responses
+Bug #2633: Improve errors handling in AF_PACKET
+Bug #2653: llc detection failure in configure.ac
+Bug #2677: coverity: ja3 potential memory leak
+Bug #2679: build with profiling enabled on generates compile warnings
+Bug #2704: DNSv1 for Rust enabled builds.
+Bug #2705: configure: Test for PyYAML and disable suricata-update if not installed.
+Bug #2716: Stats interval are 1 second too early each tick
+Bug #2717: nfs related panic in 4.1
+Bug #2719: Failed Assertion, Suricata Abort - util-mpm-hs.c line 163 (4.1.x)
+Bug #2723: dns v2 json output should always set top-level rrtype in responses
+Bug #2730: rust/dns/lua - The Lua calls for DNS values when using Rust don't behave the same as the C implementation.
+Bug #2731: multiple instances of transaction loggers are broken
+Bug #2734: unix runmode deadlock when using too many threads
+
+4.1.0 -- 2018-11-06
+
+Bug #2467: 4.1beta1 - non rust builds with SMB enabled
+Bug #2657: smtp segmentation fault
+Bug #2663: libhtp 0.5.28
+
+4.1.0-rc2 -- 2018-10-16
+
+Feature #2279: TLS 1.3 decoding, SNI extraction and logging
+Feature #2562: Add http_port in http eve-log if specified in the hostname
+Feature #2567: multi-tenancy: add 'device' selector
+Feature #2638: community flow id
+Optimization #2579: tcp: SegmentSmack
+Optimization #2580: ip: FragmentSmack
+Bug #2100: af_packet: High latency
+Bug #2212: profiling: app-layer profiling shows time spent in HTTP on UDP
+Bug #2419: Increase size of length of Decoder handlers from uint16 to uint32
+Bug #2491: async-oneside and midstream not working as expected
+Bug #2522: The cross-effects of rules on each other, without the use of flowbits.
+Bug #2541: detect-parse: missing space in error message
+Bug #2552: "Drop" action is logged as "allowed" in af_packet and netmap modes
+Bug #2554: suricata does not detect a web-attack
+Bug #2555: Ensure strings in eve-log are json-encodable
+Bug #2558: negated fileext and filename do not work as expected
+Bug #2559: DCE based rule false positives
+Bug #2566: memleak: applayer dhcp with 4.1.0-dev (rev 9370805)
+Bug #2570: Signature affecting another's ability to detect and alert
+Bug #2571: coredump: liballoc/vec.rs dhcp
+Bug #2573: prefilter keyword doesn't work when detect.prefilter.default=mpm
+Bug #2574: prefilter keyword as alias for fast_pattern is broken
+Bug #2603: memleak/coredump: Ja3BufferInit
+Bug #2604: memleak: DetectEngineStateAlloc with ipsec-events.rules
+Bug #2606: File descriptor leak in af-packet mode
+Bug #2615: processing of nonexistent pcap 
+
+4.1.0-rc1 -- 2018-07-20
+
+Feature #2292: flow: add icmpv4 and improve icmpv6 flow handling
+Feature #2298: pcap: store pcaps in compressed form
+Feature #2416: Increase XFF coverage to files and http log
+Feature #2417: Add Option to Delete Pcap Files After Processing
+Feature #2455: Add WinDivert source to Windows builds
+Feature #2456: LZ4 compression for pcap logs
+Optimization #2461: Let user to explicit disable libnss and libnspr support
+Bug #1929: yaml: ConfYamlHandleInclude memleak
+Bug #2090: Rule-reload in multi-tenancy is buggy
+Bug #2217: event_type flow is missing icmpv4 (while it has icmpv6) info wherever available
+Bug #2463: memleak: gitmaster flash decompression - 4.1.0-dev (rev efdc592)
+Bug #2469: The autoconf script throws and error when af_packet is enabled and then continues
+Bug #2481: integer overflow caused by casting uin32 to uint16 in detection
+Bug #2492: Inverted IP params in fileinfo events
+Bug #2496: gcc 8 warnings
+Bug #2498: Lua file output script causes a segfault when protocol is not HTTP
+Bug #2501: Suricata stops inspecting TCP stream if a TCP RST was met
+Bug #2504: ntp parser update cause build failure
+Bug #2505: getrandom prevents any suricata start commands on more later OS's
+Bug #2511: Suricata gzip unpacker bypass
+Bug #2515: memleak: when using smb rules without rust
+Bug #2516: Dead lock caused by unix command register-tenant
+Bug #2518: Tenant rules reload completely broken in 4.x.x
+Bug #2520: Invalid application layer logging in alert for DNS
+Bug #2521: rust: dns warning during compile
+Bug #2536: libhtp 0.5.27
+Bug #2542: ssh out of bounds read
+Bug #2543: enip out of bounds read
+
+4.1.0-beta1 -- 2018-03-22
+
+Feature #550: Extract file attachments from FTP
+Feature #646: smb log feature to be introduced
+Feature #719: finish/enable smb2 app layer parser
+Feature #723: Add support for smb 3
+Feature #724: Prevent resetting in UNIX socket mode
+Feature #735: Introduce content_len keyword
+Feature #741: Introduce endswith keyword
+Feature #742: startswith keyword
+Feature #1006: transformation api
+Feature #1198: more compact dns logging
+Feature #1201: file-store metadata in JSON format
+Feature #1386: offline: add pcap file name to EVE
+Feature #1458: unix-socket - make rule load errs available
+Feature #1476: Suricata Unix socket PCAP processing stats should not need to reset after each run
+Feature #1579: Support Modbus Unit Identifier
+Feature #1585: unix-socket: improve information regarding ruleset
+Feature #1600: flash file decompression for file_data
+Feature #1678: open umask settings or make them configurable
+Feature #1948: allow filestore name configuration options
+Feature #1949: only write unique files
+Feature #2020: eve: add body of signature to eve.json alert
+Feature #2062: tls: reimplement tls.fingerprint
+Feature #2076: Strip whitespace from buffers
+Feature #2086: DNS answer for a NS containing multiple name servers should only be one line
+Feature #2142: filesize: support other units than only bytes
+Feature #2192: JA3 TLS client fingerprinting
+Feature #2199: DNS answer events compacted
+Feature #2222: Batch submission of PCAPs over the socket
+Feature #2253: Log rule metadata in alert event
+Feature #2285: modify memcaps over unix socket
+Feature #2295: decoder: support PCAP LINKTYPE_IPV4
+Feature #2299: pcap: read directory with pcaps from the commandline
+Feature #2303: file-store enhancements (aka file-store v2): deduplication; hash-based naming; json metadata and cleanup tooling
+Feature #2352: eve: add "metadata" field to alert (rework of vars)
+Feature #2382: deprecate: CUDA support
+Feature #2399: eBPF and XDP bypass for AF_PACKET capture method
+Feature #2464: tftp logging
+Optimization #2193: random: support getrandom(2) if available
+Optimization #2302: rule parsing: faster parsing by not using pcre
+Bug #993: libhtp upgrade to handle responses first
+Bug #1503: lua output setup failure does not exit engine with --init-errors-fatal
+Bug #1788: af-packet coverity warning
+Bug #1842: Duplicated analyzer in Prelude alert
+Bug #1904: modbus: duplicate alerts / detection unaware of direction
+Bug #2202: BUG_ON asserts in AppLayerIncFlowCounter
+Bug #2229: mem leak AFP with 4.0.0-dev (rev 1180687)
+Bug #2240: suricatasc dump-counters returns error when return message is larger than 4096
+Bug #2252: Rule parses in 4.0 when flow to client is set and http_client_body is used.
+Bug #2258: rate_filter inconsistency: triggered after "count" detections when by_rule, and after count+1 detections when by_src/by_dst.
+Bug #2268: Don't printf util-enum errors
+Bug #2288: Suricata segfaults on ICMP and flowint check
+Bug #2294: rules: depth < content rules not rejected (master)
+Bug #2307: segfault in http_start with 4.1.0-dev (rev 83f220a)
+Bug #2335: conf: stack-based buffer-overflow in ParseFilename
+Bug #2345: conf: Memory-leak in DetectAddressTestConfVars
+Bug #2346: conf: NULL-pointer dereference in ConfUnixSocketIsEnable
+Bug #2347: conf: use of NULL-pointer in DetectLoadCompleteSigPath
+Bug #2349: conf: multiple NULL-pointer dereferences in FlowInitConfig
+Bug #2353: Command Line Options Ignored with pcap-file-continuous setting
+Bug #2354: conf: multiple NULL-pointer dereferences in StreamTcpInitConfig
+Bug #2356: coverity issues in new pcap file/directory handling
+Bug #2360: possible deadlock with signal handling
+Bug #2364: rust/dns: logging missing string versions of rtypes and rcodes
+Bug #2365: rust/dns: flooded by 'LogDnsLogger not implemented for Rust DNS'
+Bug #2367: Conf: Multipe NULL-pointer dereferences in HostInitConfig
+Bug #2368: Conf: Multipe NULL-pointer dereferences after ConfGetBool in StreamTcpInitConfig
+Bug #2370: Conf: Multipe NULL-pointer dereferences in PostConfLoadedSetup
+Bug #2390: mingw linker error with rust
+Bug #2391: libhtp 0.5.26
+Bug #2394: Pcap Directory May Miss Files
+Bug #2397: Call to panic()! macro in Rust NFS decoder causes crash on malformed NFS traffic
+Bug #2398: Lua keyword cmd help documentation pointing to old docs
+Bug #2402: http_header_names doesn't operate as documented
+Bug #2403: Crash for offline pcap mode when running in single mode
+Bug #2407: Fix timestamp offline when pcap timestamp is zero
+Bug #2408: fix print backslash in PrintRawUriFp
+Bug #2414: NTP parser registration frees used memory
+Bug #2418: Skip configuration "include" nodes when file is empty
+Bug #2420: Use pthread_sigmask instead of sigprogmask for signal handling
+Bug #2425: DNP3 memcpy buffer overflow
+Bug #2427: Suricata 3.x.x and 4.x.x do not parse HTTP responses if tcp data was sent before 3-way-handshake completed
+Bug #2430: http eve log data source/dest flip
+Bug #2437: rust/dns: Core Dump with malformed traffic
+Bug #2442: der parser: bad input consumes cpu and memory
+Bug #2446: http bodies / file_data: thread space creation writing out of bounds (master)
+Bug #2451: Missing Files Will Cause Pcap Thread to No Longer Run in Unix Socket Mode
+Bug #2454: master - suricata.c:2473-2474 - SIGUSR2 not wrapped in #ifndef OS_WIN32
+Bug #2466: [4.1beta1] Messages with SC_LOG_CONFIG level are logged to syslog with EMERG priority
+
+4.0.1 -- 2017-10-18
+
+Bug #2050: TLS rule mixes up server and client certificates
+Bug #2064: Rules with dual classtype do not error
+Bug #2074: detect msg: memory leak
+Bug #2102: Rules with dual sid do not error
+Bug #2103: Rules with dual rev do not error
+Bug #2151: The documentation does not reflect current suricata.yaml regarding cpu-affinity
+Bug #2194: rust/nfs: sigabrt/rust panic - 4.0.0-dev (rev fc22943)
+Bug #2197: rust build with lua enabled fails on x86
+Bug #2201: af_packet: suricata leaks memory with use-mmap enabled and incorrect BPF filter
+Bug #2207: DNS UDP "Response" parsing recording an incorrect value
+Bug #2208: mis-structured JSON stats output if interface name is shortened
+Bug #2226: improve error message if stream memcaps too low
+Bug #2228: enforcing specific number of threads with autofp does not seem to work
+Bug #2244: detect state uses broken offset logic (4.0.x)
+Feature #2114: Redis output: add RPUSH support
+Feature #2152: Packet and Drop Counters for Napatech
+
+4.0.0 -- 2017-07-27
+
+Feature #2138: Create a sample systemd service file.
+Feature #2184: rust: increase minimally supported rustc version to 1.15
+Bug #2169: dns/tcp: reponse traffic leads to 'app_proto_tc: failed'
+Bug #2170: Suricata fails on large BPFs with AF_PACKET
+Bug #2185: rust: build failure if libjansson is missing
+Bug #2186: smb dcerpc segfaults in StubDataParser
+Bug #2187: hyperscan: mpm setup error leads to crash
+
+4.0.0-rc2 -- 2017-07-13
+
+Feature #744: Teredo configuration
+Feature #1748: lua: expose tx in alert lua scripts
+Bug #1855: alert number output
+Bug #1888: noalert in a pass rule disables the rule
+Bug #1957: PCRE lowercase enforcement in http_host buffer does not allow for upper case in hex-encoding
+Bug #1958: Possible confusion or bypass within the stream engine with retransmits.
+Bug #2110: isdataat: keyword memleak
+Bug #2162: rust/nfs: reachable asserting rust panic
+Bug #2175: rust/nfs: panic - 4.0.0-dev (rev 7c25a2d)
+Bug #2176: gcc 7.1.1 'format truncation' compiler warnings
+Bug #2177: asn1/der: stack overflow
+
+4.0.0-rc1 -- 2017-06-28
+
+Feature #2095: eve: http body in alert event
+Feature #2131: nfs: implement GAP support
+Feature #2156: Add app_proto or partial flow entry to alerts
+Feature #2163: ntp parser
+Feature #2164: rust: external parser crate support
+Bug #1930: Segfault when event rule is invalid
+Bug #2038: validate app-layer API use
+Bug #2101: unix socket: stalling due to being unable to disable detect thread
+Bug #2109: asn1: keyword memleak
+Bug #2117: byte_extract and byte_test collaboration doesnt work on 3.2.1
+Bug #2141: 4.0.0-dev (rev 8ea9a5a) segfault
+Bug #2143: Bypass cause missing alert on packets only signatures
+Bug #2144: rust: panic in dns/tcp
+Bug #2148: rust/dns: panic on malformed rrnames
+Bug #2153: starttls 'tunnel' packet issue - nfq_handle_packet error -1
+Bug #2154: Dynamic stack overflow in payload printable output
+Bug #2155: AddressSanitizer double-free error
+Bug #2157: Compilation Issues Beta 4.0
+Bug #2158: Suricata v4.0.0-beta1 dns_query; segmentation fault
+Bug #2159: http: 2221028 triggers on underscore in hostname
+Bug #2160: openbsd: pcap with raw datalink not supported
+Bug #2161: libhtp 0.5.25
+Bug #2165: rust: releases should include crate dependencies (cargo-vendor)
+
+4.0.0-beta1 -- 2017-06-07
+
+Feature #805: Add support for applayer change
+Feature #806: Implement STARTTLS support
+Feature #1636: Signal rotation of unified2 log file without restart
+Feature #1953: lua: expose flow_id
+Feature #1969: TLS transactions with session resumption are not logged
+Feature #1978: Using date in logs name
+Feature #1998: eve.tls: custom TLS logging
+Feature #2006: tls: decode certificate serial number
+Feature #2011: eve.alert: print outside IP addresses on alerts on traffic inside tunnels
+Feature #2046: Support custom file permissions per logger
+Feature #2061: lua: get timestamps from flow
+Feature #2077: Additional HTTP Header Contents and Negation
+Feature #2123: unix-socket: additional runmodes
+Feature #2129: nfs: parser, logger and detection
+Feature #2130: dns: rust parser with stateless behaviour
+Feature #2132: eve: flowbit and other vars logging
+Feature #2133: unix socket: add/remove hostbits
+Bug #1335: suricata option --pidfile overwrites any file
+Bug #1470: make install-full can have race conditions on OSX.
+Bug #1759: CentOS5 EOL tasks
+Bug #2037: travis: move off legacy support
+Bug #2039: suricata stops processing when http-log output via unix_stream backs up
+Bug #2041: bad checksum 0xffff
+Bug #2044: af-packet: faulty VLAN handling in tpacket-v3 mode
+Bug #2045: geoip: compile warning on CentOS 7
+Bug #2049: Empty rule files cause failure exit code without corresponding message
+Bug #2051: ippair: xbit unset memory leak
+Bug #2053: ippair: pair is direction sensitive
+Bug #2070: file store: file log / file store mismatch with multiple files
+Bug #2072: app-layer: fix memleak on bad traffic
+Bug #2078: http body handling: failed assertion
+Bug #2088: modbus: clang-4.0 compiler warnings
+Bug #2093: Handle TCP stream gaps.
+Bug #2097: "Name of device should not be null" appears in suricata.log when using pfring with configuration from suricata.yaml
+Bug #2098: isdataat: fix parsing issue with leading spaces
+Bug #2108: pfring: errors when compiled with asan/debug
+Bug #2111: doc: links towards http_header_names
+Bug #2112: doc: links towards certain http_ keywords not working
+Bug #2113: Race condition starting Unix Server
+Bug #2118: defrag - overlap issue in linux policy
+Bug #2125: ASAN SEGV - Suricata version 4.0dev (rev 922a27e)
+Optimization #521: Introduce per stream thread segment pool
+Optimization #1873: Classtypes missing on decoder-events,files, and stream-events
+
+3.2.1 -- 2017-02-15
+
+Feature #1951: Allow building without libmagic/file
+Feature #1972: SURICATA ICMPv6 unknown type 143 for MLDv2 report
+Feature #2010: Suricata should confirm SSSE3 presence at runtime when built with Hyperscan support
+Bug #467: compilation with unittests & debug validation
+Bug #1780: VLAN tags not forwarded in afpacket inline mode
+Bug #1827: Mpm AC fails to alloc memory
+Bug #1843: Mpm Ac: int overflow during init
+Bug #1887: pcap-log sets snaplen to -1
+Bug #1946: can't get response info in some situation
+Bug #1973: suricata fails to start because of unix socket
+Bug #1975: hostbits/xbits memory leak
+Bug #1982: tls: invalid record event triggers on valid traffic
+Bug #1984: http: protocol detection issue if both sides are malformed
+Bug #1985: pcap-log: minor memory leaks
+Bug #1987: log-pcap: pcap files created with invalid snaplen
+Bug #1988: tls_cert_subject bug
+Bug #1989: SMTP protocol detection is case sensitive
+Bug #1991: Suricata cannot parse ports: "![1234, 1235]"
+Bug #1997: tls-store: bug that cause Suricata to crash
+Bug #2001: Handling of unsolicited DNS responses.
+Bug #2003: BUG_ON body sometimes contains side-effectual code
+Bug #2004: Invalid file hash computation when force-hash is used
+Bug #2005: Incoherent sizes between request, capture and http length
+Bug #2007: smb: protocol detection just checks toserver
+Bug #2008: Suricata 3.2, pcap-log no longer works due to timestamp_pattern PCRE
+Bug #2009: Suricata is unable to get offloading settings when run under non-root
+Bug #2012: dns.log does not log unanswered queries
+Bug #2017: EVE Log Missing Fields
+Bug #2019: IPv4 defrag evasion issue
+Bug #2022: dns: out of bound memory read
+
+3.2 -- 2016-12-01
+
+Bug #1117: PCAP file count does not persist
+Bug #1577: luajit scripts load error
+Bug #1924: Windows dynamic DNS updates trigger 'DNS malformed request data' alerts
+Bug #1938: suricata: log handling issues
+Bug #1955: luajit script init failed
+Bug #1960: Error while parsing rule with PCRE keyword with semicolon
+Bug #1961: No error on missing semicolon between depth and classtype
+Bug #1965: dnp3/enip/cip keywords naming convention
+Bug #1966: af-packet fanout detection broken on Debian Jessie (master)
+
+3.2RC1 -- 2016-11-01
+
+Feature #1906: doc: install man page and ship pdf
+Feature #1916: lua: add an SCPacketTimestamp function
+Feature #1867: rule compatibility: flow:not_established not supported.
+Bug #1525: Use pkg-config for libnetfilter_queue
+Bug #1690: app-layer-proto negation issue
+Bug #1909: libhtp 0.5.23
+Bug #1914: file log always shows stored: no even if file is stored
+Bug #1917: nfq: bypass SEGV
+Bug #1919: filemd5: md5-list does not allow comments any more
+Bug #1923: dns - back to back requests results in loss of response
+Bug #1928: flow bypass leads to memory errors
+Bug #1931: multi-tenancy fails to start
+Bug #1932: make install-full does not install tls-events.rules
+Bug #1935: Check redis reply in non pipeline mode
+Bug #1936: Can't set fast_pattern on tls_sni content
+
+3.2beta1 -- 2016-10-03
+
+Feature #509: add SHA1 and SHA256 checksum support for files
+Feature #1231: ssl_state negation support
+Feature #1345: OOBE -3- disable NIC offloading by default
+Feature #1373: Allow different reassembly depth for filestore rules
+Feature #1495: EtherNet/IP and CIP support
+Feature #1583: tls: validity fields (notBefore and notAfter)
+Feature #1657: Per application layer stats
+Feature #1896: Reimplement tls.subject and tls.isserdn
+Feature #1903: tls: tls_cert_valid and tls_cert_expired keywords
+Feature #1907: http_request_line and http_response_line
+Optimization #1044: TLS buffers evaluated by fast_pattern matcher.
+Optimization #1277: Trigger second live rule-reload while first one is in progress
+Bug #312: incorrect parsing of rules with missing semi-colon for keywords
+Bug #712: wildcard matches on tls.subject
+Bug #1353: unix-command socket created with last character missing
+Bug #1486: invalid rule: parser err msg not descriptive enough
+Bug #1525: Use pkg-config for libnetfilter_queue
+Bug #1893: tls: src_ip and dest_ip reversed in TLS events for IPS vs IDS mode.
+Bug #1898: Inspection does not always stop when stream depth is reached
+
+3.1.2 -- 2016-09-06
+
+Feature #1830: support 'tag' in eve log
+Feature #1870: make logged flow_id more unique
+Feature #1874: support Cisco Fabric Path / DCE
+Feature #1885: eve: add option to log all dropped packets
+Bug #1849: ICMPv6 incorrect checksum alert if Ethernet FCS is present
+Bug #1853: suricata is matching everything on dce_stub_data buffer
+Bug #1854: unified2: logging of tagged packets not working
+Bug #1856: PCAP mode device not found
+Bug #1858: Lots of TCP 'duplicated option/DNS malformed request data' after upgrading from 3.0.1 to 3.1.1
+Bug #1878: dns: crash while logging sshfp records
+Bug #1880: icmpv4 error packets can lead to missed detection in tcp/udp
+Bug #1884: libhtp 0.5.22
+
+3.1.1 -- 2016-07-13
+
+Feature #1775: Lua: SMTP-support
+Bug #1419: DNS transaction handling issues
+Bug #1515: Problem with Threshold.config when using more than one IP
+Bug #1664: Unreplied DNS queries not logged when flow is aged out
+Bug #1808: Can't set thread priority after dropping privileges.
+Bug #1821: Suricata 3.1 fails to start on CentOS6
+Bug #1839: suricata 3.1 configure.ac says >=libhtp-0.5.5, but >=libhtp-0.5.20 required
+Bug #1840: --list-keywords and --list-app-layer-protos not working
+Bug #1841: libhtp 0.5.21
+Bug #1844: netmap: IPS mode doesn't set 2nd iface in promisc mode
+Bug #1845: Crash on disabling a app-layer protocol when it's logger is still enabled
+Optimization #1846: af-packet: improve thread calculation logic
+Optimization #1847: rules: don't warn on empty files
+
+3.1 -- 2016-06-20
+
+Bug #1589: Cannot run nfq in workers mode
+Bug #1804: yaml: legacy detect-engine parsing custom values broken
+
+3.1RC1 -- 2016-06-07
+
+Feature #681: Implement TPACKET_V3 support in AF_PACKET
+Feature #1134: tls: server name rule keyword
+Feature #1343: OOBE -1- increasing the default stream.memcap and stream.reassembly.memcap values
+Feature #1344: OOBE -2- decreasing the default flow-timeouts (at least for TCP)
+Feature #1563: dns: log sshfp records
+Feature #1760: Unit tests: Don't register return value, use 1 for success, 0 for failure.
+Feature #1761: Unit tests: Provide macros for clean test failures.
+Feature #1762: default to AF_PACKET for -i if available
+Feature #1785: hyperscan spm integration
+Feature #1789: hyperscan mpm: enable by default
+Feature #1797: netmap: implement 'threads: auto'
+Feature #1798: netmap: warn about NIC offloading on FreeBSD
+Feature #1800: update bundled libhtp to 0.5.20
+Feature #1801: reduce info level verbosity
+Feature #1802: yaml: improve default layout
+Feature #1803: reimplement rule grouping
+Bug #1078: 'Not" operator (!) in Variable causes extremely slow loading of Suricata
+Bug #1202: detect-engine profile medium consumes more memory than detect-engine profile high
+Bug #1289: MPM b2gm matcher has questionable code
+Bug #1487: Configuration parser depends on key ordering
+Bug #1524: Potential Thread Name issues due to RHEL7 Interface Naming Contentions
+Bug #1584: Rule keywords conflict will cause Suricata restart itself in loop
+Bug #1606: [ERRCODE: SC_ERR_SYSCALL(50)] - Failure when trying to get MTU via ioctl: 6
+Bug #1665: Default maximum packet size is insufficient when VLAN tags are present (and not stripped)
+Bug #1714: Kernel panic on application exit with netmap Suricata 3.0 stable
+Bug #1746: deadlock with autofp and --disable-detection
+Bug #1764: app-layer-modbus: AddressSanitizer error (segmentation fault)
+Bug #1768: packet processing threads doubled
+Bug #1771: tls store memory leak
+Bug #1773: smtp: not all attachments inspected in all cases
+Bug #1786: spm crash on rule reload
+Bug #1792: dns-json-log produces no output
+Bug #1795: Remove unused CPU affinity settings from suricata.yaml
+Optimization #563: pmq optimization -- remove patter_id_array
+Optimization #1037: Optimize TCP Option storage
+Optimization #1418: lockless flow handling during capture (autofp)
+Optimization #1784: reduce storage size of IPv4 options and IPv6 ext hdrs
+
+3.0.1 -- 2016-04-04
+
+Feature #1704: hyperscan mpm integration
+Feature #1661: Improved support for xbits/hostbits (in particular ip_pair) when running with multiple threads
+Bug #1697: byte_extract incompatibility with Snort.
+Bug #1737: Stats not reset between PCAPs when Suricata runs in socket mode
+
+3.0.1RC1 -- 2016-03-23
+
+Feature #1535: Expose the certificate itself in TLS-lua
+Feature #1696: improve logged flow_id
+Feature #1700: enable "relro" and "now" in compile options for 3.0
+Feature #1734: gre: support transparent ethernet bridge decoding
+Feature #1740: Create counters for decode-events errors
+Bug #873: suricata.yaml: .mgc is NOT actually added to value for magic file
+Bug #1166: tls: CID 1197759: Resource leak (RESOURCE_LEAK)
+Bug #1268: suricata and macos/darwin: [ERRCODE: SC_ERR_MAGIC_LOAD(197)] - magic_load failed: File 5.19 supports only version 12 magic files. `/usr/share/file/magic.mgc' is version 7
+Bug #1359: memory leak
+Bug #1411: Suricata generates huge load when nfq_create_queue failed
+Bug #1570: stream.inline defaults to IDS mode if missing
+Bug #1591: afpacket: unsupported datalink type 65534 on tun device
+Bug #1619: Per-Thread Delta Stats Broken
+Bug #1638: rule parsing issues: rev
+Bug #1641: Suricata won't build with --disable-unix-socket when libjansson is enabled
+Bug #1646: smtp: fix inspected tracker values
+Bug #1660: segv when using --set on a list
+Bug #1669: Suricate 3.0RC3 segfault after 10 hours
+Bug #1670: Modbus compiler warnings on Fedora 23
+Bug #1671: Cygwin Windows compilation with libjansson from source
+Bug #1674: Cannot use 'tag:session' after base64_data keyword
+Bug #1676: gentoo build error
+Bug #1679: sensor-name configuration parameter specified in wrong place in default suricata.yaml
+Bug #1680: Output sensor name in json
+Bug #1684: eve: stream payload has wrong direction in IPS mode
+Bug #1686: Conflicting "no" for "totals" and "threads" in stats output
+Bug #1689: Stack overflow in case of variables misconfiguration
+Bug #1693: Crash on Debian with libpcre 8.35
+Bug #1695: Unix Socket missing dump-counters mode
+Bug #1698: Segmentation Fault at detect-engine-content-inspection.c:438 (master)
+Bug #1699: CUDA build broken
+Bug #1701: memory leaks
+Bug #1702: TLS SNI parsing issue
+Bug #1703: extreme slow down in HTTP multipart parsing
+Bug #1706: smtp memory leaks
+Bug #1707: malformed json if message is too big
+Bug #1708: dcerpc memory leak
+Bug #1709: http memory leak
+Bug #1715: nfq: broken time stamps with recent Linux kernel 4.4
+Bug #1717: Memory leak on Suricata 3.0 with Netmap
+Bug #1719: fileinfo output wrong in eve in http
+Bug #1720: flowbit memleak
+Bug #1724: alert-debuglog: non-decoder events won't trigger rotation.
+Bug #1725: smtp logging memleak
+Bug #1727: unix socket runmode per pcap memory leak
+Bug #1728: unix manager command channel memory leaks
+Bug #1729: PCRE jit is disabled/blacklisted when it should not
+Bug #1731: detect-tls memory leak
+Bug #1735: cppcheck: Shifting a negative value is undefined behaviour
+Bug #1736: tls-sni: memory leaks on malformed traffic
+Bug #1742: vlan use-for-tracking including Priority in hashing
+Bug #1743: compilation with musl c library fails
+Bug #1744: tls: out of bounds memory read on malformed traffic
+Optimization #1642: Add --disable-python option
+
+3.0 -- 2016-01-27
+
+Bug #1673: smtp: crash during mime parsing
+
+3.0RC3 -- 2015-12-21
+
+Bug #1632: Fail to download large file with browser
+Bug #1634: Fix non thread safeness of Prelude analyzer
+Bug #1640: drop log crashes
+Bug #1645: Race condition in unix manager
+Bug #1647: FlowGetKey flow-hash.c:240 segmentation fault (master)
+Bug #1650: DER parsing issue (master)
+
+3.0RC2 -- 2015-12-08
+
+Bug #1551: --enable-profiling-locks broken
+Bug #1602: eve-log prefix field feature broken
+Bug #1614: app_proto key missing from EVE file events
+Bug #1615: disable modbus by default
+Bug #1616: TCP reassembly bug
+Bug #1617: DNS over TCP parsing issue
+Bug #1618: SMTP parsing issue
+Feature #1635: unified2 output: disable by default
+
+3.0RC1 -- 2015-11-25
+
+Bug #1150: TLS store disabled by TLS EVE logging
+Bug #1210: global counters in stats.log
+Bug #1423: Unix domain log file writer should automatically reconnect if receiving program is restarted.
+Bug #1466: Rule reload - Rules won't reload if rule files are listed in an included file.
+Bug #1467: Specifying an IPv6 entry before an IPv4 entry in host-os-policy causes ASAN heap-buffer-overflow.
+Bug #1472: Should 'goodsigs' be 'goodtotal' when checking if signatures were loaded in detect.c?
+Bug #1475: app-layer-modbus: AddressSanitizer error (heap-buffer-overflow)
+Bug #1481: Leading whitespace in flowbits variable names
+Bug #1482: suricata 2.1 beta4: StoreStateTxFileOnly crashes
+Bug #1485: hostbits - leading and trailing spaces are treated as part of the name and direction.
+Bug #1488: stream_size <= and >= modifiers function as < and > (equality is not functional)
+Bug #1491: pf_ring is not able to capture packets when running under non-root account
+Bug #1493: config test (-T) doesn't fail on missing files
+Bug #1494: off by one on rulefile count
+Bug #1500: suricata.log
+Bug #1508: address var parsing issue
+Bug #1517: Order dependent, ambiguous YAML in multi-detect.
+Bug #1518: multitenancy - selector vlan - vlan id range
+Bug #1521: multitenancy - global vlan tracking relation to selector
+Bug #1523: Decoded base64 payload short by 16 characters
+Bug #1530: multitenant mapping relation
+Bug #1531: multitenancy - confusing tenant id and vlan id output
+Bug #1556: MTU setting on NIC interface not considered by af-packet
+Bug #1557: stream: retransmission not detected
+Bug #1565: defrag: evasion issue
+Bug #1597: dns parser issue (master)
+Bug #1601: tls: server name logging
+Feature #1116: ips packet stats in stats.log
+Feature #1137: Support IP lists in threshold.config
+Feature #1228: Suricata stats.log in JSON format
+Feature #1265: Replace response on Suricata dns decoder when dns error please
+Feature #1281: long snort ruleset support for "SC_ERR_NOT_SUPPORTED(225): content length greater than 255 unsupported"
+Feature #1282: support for base64_decode from snort's ruleset
+Feature #1342: Support Cisco erspan traffic
+Feature #1374: Write pre-aggregated counters for all threads
+Feature #1408: multi tenancy for detection
+Feature #1440: Load rules file from a folder or with a star pattern rather then adding them manually to suricata.yaml
+Feature #1454: Proposal to add Lumberjack/CEE formatting option to EVE JSON syslog output for compatibility with rsyslog parsing
+Feature #1492: Add HUP coverage to output json-log
+Feature #1498: color output
+Feature #1499: json output for engine messages
+Feature #1502: Expose tls fields to lua
+Feature #1514: SSH softwareversion regex should allow colon
+Feature #1527: Add ability to compile as a Position-Independent Executable (PIE)
+Feature #1568: TLS lua output support
+Feature #1569: SSH lua support
+Feature #1582: Redis output support
+Feature #1586: Add flow memcap counter
+Feature #1599: rule profiling: json output
+Optimization #1269: Convert SM List from linked list to array
+
+2.1beta4 -- 2015-05-08
+
+Bug #1314: http-events performance issues
+Bug #1340: null ptr dereference in Suricata v2.1beta2 (output-json.c:347)
+Bug #1352: file list is not cleaned up
+Bug #1358: Gradual memory leak using reload (kill -USR2 $pid)
+Bug #1366: Crash if default_packet_size is below 32 bytes
+Bug #1378: stats api doesn't call thread deinit funcs
+Bug #1384: tcp midstream window issue (master)
+Bug #1388: pcap-file hangs on systems w/o atomics support (master)
+Bug #1392: http uri parsing issue (master)
+Bug #1393: CentOS 5.11 build failures
+Bug #1398: DCERPC traffic parsing issue (master)
+Bug #1401: inverted matching on incomplete session
+Bug #1402: When re-opening files on HUP (rotation) always use the append flag.
+Bug #1417: no rules loaded - latest git - rev e250040
+Bug #1425: dead lock in de_state vs flowints/flowvars
+Bug #1426: Files prematurely truncated by detection engine even though force-md5 is enabled
+Bug #1429: stream: last_ack update issue leading to stream gaps
+Bug #1435: EVE-Log alert payload option loses data
+Bug #1441: Local timestamps in json events
+Bug #1446: Unit ID check in Modbus packet error
+Bug #1449: smtp parsing issue
+Bug #1451: Fix list-keywords regressions
+Bug #1463: modbus parsing issue
+Feature #336: Add support for NETMAP to Suricata.
+Feature #885: smtp file_data support
+Feature #1394: Improve TCP reuse support
+Feature #1410: add alerts to EVE's drop logs
+Feature #1445: Suricata does not work on pfSense/FreeBSD interfaces using PPPoE
+Feature #1447: Ability to reject ICMP traffic
+Feature #1448: xbits
+Optimization #1014: app layer reassembly fast-path
+Optimization #1377: flow manager: reduce (try)locking
+Optimization #1403: autofp packet pool performance problems
+Optimization #1409: http pipeline support for stateful detection
+
+2.1beta3 -- 2015-01-29
+
+Bug #977: WARNING on empty rules file is fatal (should not be)
+Bug #1184: pfring: cppcheck warnings
+Bug #1321: Flow memuse bookkeeping error
+Bug #1327: pcre pkt/flowvar capture broken for non-relative matches (master)
+Bug #1332: cppcheck: ioctl
+Bug #1336: modbus: CID 1257762: Logically dead code (DEADCODE)
+Bug #1351: output-json: duplicate logging (2.1.x)
+Bug #1354: coredumps on quitting on OpenBSD
+Bug #1355: Bus error when reading pcap-file on OpenBSD
+Bug #1363: Suricata does not compile on OS X/Clang due to redefinition of string functions (2.1.x)
+Bug #1365: evasion issues (2.1.x)
+Feature #1261: Request for Additional Lua Capabilities
+Feature #1309: Lua support for Stats output
+Feature #1310: Modbus parsing and matching
+Feature #1317: Lua: Indicator for end of flow
+Feature #1333: unix-socket: allow (easier) non-root usage
+Optimization #1339: flow timeout optimization
+Optimization #1339: flow timeout optimization
+Optimization #1371: mpm optimization
+
+2.1beta2 -- 2014-11-06
+
+Feature #549: Extract file attachments from emails
+Feature #1312: Lua output support
+Feature #899: MPLS over Ethernet support
+Feature #707: ip reputation files - network range inclusion availability (cidr)
+Feature #383: Stream logging
+Feature #1263: Lua: Access to Stream Payloads
+Feature #1264: Lua: access to TCP quad / Flow Tuple
+Bug #1048: PF_RING/DNA config - suricata.yaml
+Bug #1230: byte_extract, within combination not working
+Bug #1257: Flow switch is missing from the eve-log section in suricata.yaml
+Bug #1259: AF_PACKET IPS is broken in 2.1beta1
+Bug #1260: flow logging at shutdown broken
+Bug #1279: BUG: NULL pointer dereference when suricata was debug mode.
+Bug #1280: BUG: IPv6 address vars issue
+Bug #1285: Lua - http.request_line not working (2.1)
+Bug #1287: Lua Output has dependency on eve-log:http
+Bug #1288: Filestore keyword in wrong place will cause entire rule not to trigger
+Bug #1294: Configure doesn't use --with-libpcap-libraries when testing PF_RING library
+Bug #1301: suricata yaml - PF_RING load balance per hash option
+Bug #1308: http_header keyword not matching when SYN|ACK and ACK missing (master)
+Bug #1311: EVE output Unix domain socket not working (2.1)
+
+2.1beta1 -- 2014-08-12
+
+Feature #1155: Log packet payloads in eve alerts
+Feature #1208: JSON Output Enhancement - Include Payload(s)
+Feature #1248: flow/connection logging
+Feature #1258: json: include HTTP info with Alert output
+Optimization #1039: Packetpool should be a stack
+Optimization #1241: pcap recording: record per thread
+
+2.0.3 -- 2014-08-08
+
+Bug #1236: fix potential crash in http parsing
+Bug #1244: ipv6 defrag issue
+Bug #1238: Possible evasion in stream-tcp-reassemble.c
+Bug #1221: lowercase conversion table missing last value
+Support #1207: Cannot compile on CentOS 5 x64 with --enable-profiling
+
+2.0.2 -- 2014-06-25
+
+Bug #1098: http_raw_uri with relative pcre parsing issue
+Bug #1175: unix socket: valgrind warning
+Bug #1189: abort() in 2.0dev (rev 6fbb955) with pf_ring 5.6.3
+Bug #1195: nflog: cppcheck reports memleaks
+Bug #1206: ZC pf_ring not working with Suricata 2.0.1 (or latest git)
+Bug #1211: defrag issue
+Bug #1212: core dump (after a while) when app-layer.protocols.http.enabled = yes
+Bug #1214: Global Thresholds (sig_id 0, gid_id 0) not applied correctly if a signature has event vars
+Bug #1217: Segfault in unix-manager.c line 529 when using --unix-socket and sending pcap files to be analized via socket
+Feature #781: IDS using NFLOG iptables target
+Feature #1158: Parser DNS TXT data parsing and logging
+Feature #1197: liblua support
+Feature #1200: sighup for log rotation
+
+2.0.1 -- 2014-05-21
+
+No changes since 2.0.1rc1
+
+2.0.1rc1 -- 2014-05-12
+
+Bug #978: clean up app layer parser thread local storage
+Bug #1064: Lack of Thread Deinitialization For Decoder Modules
+Bug #1101: Segmentation in AppLayerParserGetTxCnt
+Bug #1136: negated app-layer-protocol FP on multi-TX flows
+Bug #1141: dns response parsing issue
+Bug #1142: dns tcp toclient protocol detection
+Bug #1143: tls protocol detection in case of tls-alert
+Bug #1144: icmpv6: unknown type events for MLD_* types
+Bug #1145: ipv6: support PAD1 in DST/HOP extension hdr
+Bug #1146: tls: event on 'new session ticket' in handshake
+Bug #1159: Possible memory exhaustion when an invalid bpf-filter is used with AF_PACKET
+Bug #1160: Pcaps submitted via Unix Socket do not finish processing in Suricata 2
+Bug #1161: eve: src and dst mixed up in some cases
+Bug #1162: proto-detect: make sure probing parsers for all registered ports are run
+Bug #1163: HTP Segfault
+Bug #1165: af_packet - one thread consistently not working
+Bug #1170: rohash: CID 1197756: Bad bit shift operation (BAD_SHIFT)
+Bug #1176: AF_PACKET IPS mode is broken in 2.0
+Bug #1177: eve log do not show action 'dropped' just 'allowed'
+Bug #1180: Possible problem in stream tracking
+Feature #1157: Always create pid file if --pidfile command line option is provided.
+Feature #1173: tls: OpenSSL heartbleed detection
+
+2.0 -- 2014-03-25
+
+Bug #1151: tls.store not working when a TLS filter keyword is used
+
+2.0rc3 -- 2014-03-18
+
+Bug #1127: logstash & suricata parsing issue
+Bug #1128: Segmentation fault - live rule reload
+Bug #1129: pfring cluster & ring initialization
+Bug #1130: af-packet flow balancing problems
+Bug #1131: eve-log: missing user agent reported inconsistently
+Bug #1133: eve-log: http depends on regular http log
+Bug #1135: 2.0rc2 release doesn't set optimization flag on GCC
+Bug #1138: alert fastlog drop info missing
+
+2.0rc2 -- 2014-03-06
+
+Bug #611: fp: rule with ports matching on portless proto
+Bug #985: default config generates rule warnings and errors
+Bug #1021: 1.4.6: conf_filename not checked before use
+Bug #1089: SMTP: move depends on uninitialised value
+Bug #1090: FTP: Memory Leak
+Bug #1091: TLS-Handshake: Uninitialized value
+Bug #1092: HTTP: Memory Leak
+Bug #1108: suricata.yaml config parameter - segfault
+Bug #1109: PF_RING vlan handling
+Bug #1110: Can have the same Pattern ID (pid) for the same pattern but different case flags
+Bug #1111: capture stats at exit incorrect
+Bug #1112: tls-events.rules file missing
+Bug #1115: nfq: exit stats not working
+Bug #1120: segv with pfring/afpacket and eve-log enabled
+Bug #1121: crash in eve-log
+Bug #1124: ipfw build broken
+Feature #952: Add VLAN tag ID to all outputs
+Feature #953: Add QinQ tag ID to all outputs
+Feature #1012: Introduce SSH log
+Feature #1118: app-layer protocols http memcap - info in verbose mode (-v)
+Feature #1119: restore SSH protocol detection and parser
+
+2.0rc1 -- 2014-02-13
+
+Bug #839: http events alert multiple times
+Bug #954: VLAN decoder stats with AF Packet get written to the first thread only - stats.log
+Bug #980: memory leak in http buffers at shutdown
+Bug #1066: logger API's for packet based logging and tx based logging
+Bug #1068: format string issues with size_t + qa not catching them
+Bug #1072: Segmentation fault in 2.0beta2: Custom HTTP log segmentation fault
+Bug #1073: radix tree lookups are not thread safe
+Bug #1075: CUDA 5.5 doesn't compile with 2.0 beta 2
+Bug #1079: Err loading rules with variables that contain negated content.
+Bug #1080: segfault - 2.0dev (rev 6e389a1)
+Bug #1081: 100% CPU utilization with suricata 2.0 beta2+
+Bug #1082: af-packet vlan handling is broken
+Bug #1103: stats.log not incrementing decoder.ipv4/6 stats when reading in QinQ packets
+Bug #1104: vlan tagged fragmentation
+Bug #1106: Git compile fails on Ubuntu Lucid
+Bug #1107: flow timeout causes decoders to run on pseudo packets
+Feature #424: App layer registration cleanup - Support specifying same alproto names in rules for different ip protocols
+Feature #542: TLS JSON output
+Feature #597: case insensitive fileext match
+Feature #772: JSON output for alerts
+Feature #814: QinQ tag flow support
+Feature #894: clean up output
+Feature #921: Override conf parameters
+Feature #1007: united output
+Feature #1040: Suricata should compile with -Werror
+Feature #1067: memcap for http inside suricata
+Feature #1086: dns memcap
+Feature #1093: stream: configurable segment pools
+Feature #1102: Add a decoder.QinQ stats in stats.log
+Feature #1105: Detect icmpv6 on ipv4
+
+2.0beta2 -- 2013-12-18
+
+Bug #463: Suricata not fire on http reply detect if request are not http
+Bug #640: app-layer-event:http.host_header_ambiguous set when it shouldn't
+Bug #714: some logs not created in daemon mode
+Bug #810: Alerts on http traffic storing the wrong packet as the IDS event payload
+Bug #815: address parsing with negation
+Bug #820: several issues found by clang 3.2
+Bug #837: Af-packet statistics inconsistent under very high traffic
+Bug #882: MpmACCudaRegister shouldn't call PatternMatchDefaultMatcher
+Bug #887: http.log printing unknown hostname most of the time
+Bug #890: af-packet segv
+Bug #892: detect-engine.profile - custom - does not err out in incorrect toclient/srv values - suricata.yaml
+Bug #895: response: rst packet bug
+Bug #896: pfring dna mode issue
+Bug #897: make install-full fails if wget is missing
+Bug #903: libhtp valgrind warning
+Bug #907: icmp_seq and icmp_id keyword with icmpv6 traffic (master)
+Bug #910: make check fails w/o sudo/root privs
+Bug #911: HUP signal
+Bug #912: 1.4.3: Unit test in util-debug.c: line too long.
+Bug #914: Having a high number of pickup queues (216+) makes suricata crash
+Bug #915: 1.4.3: log-pcap.c: crash on printing a null filename
+Bug #917: 1.4.5: decode-ipv6.c: void function cannot return value
+Bug #920: Suricata failed to parse address
+Bug #922: trackers value in suricata.yaml
+Bug #925: prealloc-sessions value bigger than allowed in suricata.yaml
+Bug #926: prealloc host value in suricata.yaml
+Bug #927: detect-thread-ratio given a non numeric value in suricata.yaml
+Bug #928: Max number of threads
+Bug #932: wrong IP version - on stacked layers
+Bug #939: thread name buffers are sized inconsistently
+Bug #943: pfring: see if we can report that the module is not loaded
+Bug #948: apple ppc64 build broken: thread-local storage not supported for this target
+Bug #958: SSL parsing issue (master)
+Bug #963: XFF compile failure on OSX
+Bug #964: Modify negated content handling
+Bug #967: threshold rule clobbers suppress rules
+Bug #968: unified2 not logging tagged packets
+Bug #970: AC memory read error
+Bug #973: Use different ids for content patterns which are the same, but one of them has a fast_pattern chop set on it.
+Bug #976: ip_rep supplying different no of alerts for 2 different but semantically similar rules
+Bug #979: clean up app layer protocol detection memory
+Bug #982: http events missing
+Bug #987: default config generates error(s)
+Bug #988: suricata don't exit in live mode
+Bug #989: Segfault in HTPStateGetTxCnt after a few minutes
+Bug #991: threshold mem leak
+Bug #994: valgrind warnings in unittests
+Bug #995: tag keyword: tagging sessions per time is broken
+Bug #998: rule reload triggers app-layer-event FP's
+Bug #999: delayed detect inits thresholds before de_ctx
+Bug #1003: Segmentation fault
+Bug #1023: block rule reloads during delayed detect init
+Bug #1026: pfring: update configure to link with -lrt
+Bug #1031: Fix IPv6 stream pseudo packets
+Bug #1035: http uri/query normalization normalizes 'plus' sign to space
+Bug #1042: Can't match "emailAddress" field in tls.subject and tls.issuerdn
+Bug #1061: Multiple flowbit set in one rule
+Feature #234: add option disable/enable individual app layer protocol inspection modules
+Feature #417: ip fragmentation time out feature in yaml
+Feature #478: XFF (X-Forwarded-For)
+Feature #602: availability for http.log output - identical to apache log format
+Feature #622: Specify number of pf_ring/af_packet receive threads on the command line
+Feature #727: Explore the support for negated alprotos in sigs.
+Feature #746: Decoding API modification
+Feature #751: Add invalid packet counter
+Feature #752: Improve checksum detection algorithm
+Feature #789: Clean-up start and stop code
+Feature #813: VLAN flow support
+Feature #878: add storage api
+Feature #901: VLAN defrag support
+Feature #904: store tx id when generating an alert
+Feature #940: randomize http body chunks sizes
+Feature #944: detect nic offloading
+Feature #956: Implement IPv6 reject
+Feature #957: reject: iface setup
+Feature #959: Move post config initialisation code to PostConfLoadedSetup
+Feature #981: Update all switch case fall throughs with comments on false throughs
+Feature #983: Provide rule support for specifying icmpv4 and icmpv6.
+Feature #986: set htp request and response size limits
+Feature #1008: Optionally have http_uri buffer start with uri path for use in proxied environments
+Feature #1009: Yaml file inclusion support
+Feature #1032: profiling: per keyword stats
+Optimization #583: improve Packet_ structure layout
+Optimization #1018: clean up counters api
+Optimization #1041: remove mkinstalldirs from git
+
+2.0beta1 -- 2013-07-18
+
+- Luajit flow vars and flow ints support (#593)
+- DNS parser, logger and keyword support (#792), funded by Emerging Threats
+- deflate support for HTTP response bodies (#470, #775)
+- update to libhtp 0.5 (#775)
+- improved gzip support for HTTP response bodies (#470, #775)
+- redesigned transaction handling, improving both accuracy and performance (#753)
+- redesigned CUDA support (#729)
+- Be sure to always apply verdict to NFQ packet (#769)
+- stream engine: SACK allocs should adhere to memcap (#794)
+- stream: deal with multiple different SYN/ACK's better (#796)
+- stream: Randomize stream chunk size for raw stream inspection (#804)
+- Introduce per stream thread ssn pool (#519)
+- "pass" IP-only rules should bypass detection engine after matching (#718)
+- Generate error if bpf is used in IPS mode (#777)
+- Add support for batch verdicts in NFQ, thanks to Florian Westphal
+- Update Doxygen config, thanks to Phil Schroeder
+- Improve libnss detection, thanks to Christian Kreibich
+- Fix a FP on rules looking for port 0 and fragments (#847), thanks to Rmkml
+- OS X unix socket build fixed (#830)
+- bytetest, bytejump and byteextract negative offset failure (#827)
+- Fix fast.log formatting issues (#771), thanks to Rmkml
+- Invalidate negative depth (#774), thanks to Rmkml
+- Fixed accuracy issues with relative pcre matching (#791)
+- Fix deadlock in flowvar capture code (#802)
+- Improved accuracy of file_data keyword (#817)
+- Fix af-packet ips mode rule processing bug (#819), thanks to Laszlo Madarassy
+- stream: fix injecting pseudo packet too soon leading to FP (#883), thanks to Francis Trudeau
+
+1.4.4 -- 2013-07-18
+
+- Bug #834: Unix socket - showing as compiled when it is not desired to do so
+- Bug #835: Unix Socket not working as expected
+- Bug #841: configure --enable-unix-socket does not err out if libs/pkgs are not present
+- Bug #846: FP on IP frag and sig use udp port 0, thanks to Rmkml
+- Bug #864: backport packet action macro's
+- Bug #876: htp tunnel fix
+- Bug #877: Flowbit check with content doesn't match consistently, thanks to Francis Trudeau
+
+1.4.3 -- 2013-06-20
+
+- Fix missed detection in bytetest, bytejump and byteextract for negative offset (#828)
+- Fix IPS mode being unable to drop tunneled packets (#826)
+- Fix OS X Unix Socket build (#829)
+
+1.4.2 -- 2013-05-29
+
+- No longer force nocase to be used on http_host
+- Invalidate rule if uppercase content is used for http_host w/o nocase
+- Warn user if bpf is used in af-packet IPS mode
+- Better test for available libjansson version
+- Fixed accuracy issues with relative pcre matching (#784)
+- Improved accuracy of file_data keyword (#788)
+- Invalidate negative depth (#770)
+- Fix http host parsing for IPv6 addresses (#761)
+- Fix fast.log formatting issues (#773)
+- Fixed deadlock in flowvar set code for http buffers (#801)
+- Various signature ordering improvements
+- Minor stream engine fix
+
+1.4.1 -- 2013-03-08
+
+- GeoIP keyword, allowing matching on Maxmind's database, contributed by Ignacio Sanchez (#559)
+- Introduce http_host and http_raw_host keywords (#733, #743)
+- Add python module for interacting with unix socket (#767)
+- Add new unix socket commands: fetching config, counters, basic runtime info (#764, #765)
+- Big Napatech support update by Matt Keeler
+- Configurable sensor id in unified2 output, contributed by Jake Gionet (#667)
+- FreeBSD IPFW fixes by Nikolay Denev
+- Add "default" interface setting to capture configuration in yaml (#679)
+- Make sure "snaplen" can be set by the user (#680)
+- Improve HTTP URI query string normalization (#739)
+- Improved error reporting in MD5 loading (#693)
+- Improve reference.config parser error reporting (#737)
+- Improve build info output to include all configure options (#738)
+- Segfault in TLS parsing reported by Charles Smutz (#725)
+- Fix crash in teredo decoding, reported by Rmkml (#736)
+- fixed UDPv4 packets without checksum being detected as invalid (#760)
+- fixed DCE/SMB parsers getting confused in some fragmented cases (#764)
+- parsing ipv6 address/subnet parsing in thresholding was fixed by Jamie Strandboge (#697)
+- FN: IP-only rule ip_proto not matching for some protocols (#689)
+- Fix build failure with other libhtp installs (#688)
+- Fix malformed yaml loading leading to a crash (#694)
+- Various Mac OS X fixes (#700, #701, #703)
+- Fix for autotools on Mac OS X by Jason Ish (#704)
+- Fix AF_PACKET under high load not updating stats (#706)
+
+1.3.6 -- 2013-03-07
+
+- fix decoder event rules not checked in all cases (#671)
+- checksum detection for icmpv6 was fixed (#673)
+- crash in HTTP server body inspection code fixed (#675)
+- fixed a icmpv6 payload bug (#676)
+- IP-only rule ip_proto not matching for some protocols was addressed (#690)
+- fixed malformed yaml crashing suricata (#702)
+- parsing ipv6 address/subnet parsing in thresholding was fixed by Jamie Strandboge (#717)
+- crash in tls parser was fixed (#759)
+- fixed UDPv4 packets without checksum being detected as invalid (#762)
+- fixed DCE/SMB parsers getting confused in some fragmented cases (#763)
+
+1.4 2012-12-13
+
+- Decoder event matching fixed (#672)
+- Unified2 would overwrite files if file rotation happened within a second of file creation, leading to loss of events/alerts (#665)
+- Add more events to IPv6 extension header anomolies (#678)
+- Fix ICMPv6 payload and checksum calculation (#677, #674)
+- Clean up flow timeout handling (#656)
+- Fix a shutdown bug when using AF_PACKET under high load (#653)
+- Fix TCP sessions being cleaned up to early (#652)
+
+1.3.5 2012-12-06
+
+- Flow engine memory leak fixed by Ludovico Cavedon (#651)
+- Unified2 would overwrite files if file rotation happened within a second of file creation, leading to loss of events/alerts (#664)
+- Flow manager mutex used unintialized, fixed by Ludovico Cavedon (#654)
+- Windows building in CYGWIN fixed (#630)
+
+1.4rc1 2012-11-29
+
+- Interactive unix socket mode (#571, #552)
+- IP Reputation: loading and matching (#647)
+- Improved --list-keywords commandline option gives detailed info for supported keyword, including doc link (#435)
+- Rule analyzer improvement wrt ipv4/ipv6, invalid rules (#494)
+- User-Agent added to file log and filestore meta files (#629)
+- Endace DAG supports live stats and at exit drop stats (#638)
+- Add support for libhtp event "request port doesn't match tcp port" (#650)
+- Rules with negated addresses will not be considered IP-only (#599)
+- Rule reloads complete much faster in low traffic conditions (#526)
+- Suricata -h now displays all available options (#419)
+- Luajit configure time detection was improved (#636)
+- Flow manager mutex used w/o initialization (#628)
+- Cygwin work around for windows shell mangling interface string (#372)
+- Fix a Prelude output crash with alerts generated by rules w/o classtype or msg (#648)
+- CLANG compiler build fixes (#649)
+- Several fixes found by code analyzers
+
+1.4beta3 2012-11-14
+
+- support for Napatech cards was greatly improved by Matt Keeler from Npulse (#430, #619)
+- support for pkt_data keyword was added
+- user and group to run as can now be set in the config file
+- make HTTP request and response body inspection sizes configurable per HTTP server config (#560)
+- PCAP/AF_PACKET/PF_RING packet stats are now printed in stats.log (#561, #625)
+- add contrib directory to the dist (#567)
+- performance improvements to signatures with dsize option
+- improved rule analyzer: print fast_pattern along with the rule (#558)
+- fixes to stream engine reducing the number of events generated (#604)
+- add stream event to match on overlaps with different data in stream reassembly (#603)
+- stream.inline option new defaults to "auto", meaning enabled in IPS mode, disabled in IDS mode (#592)
+- HTTP handling in OOM condition was greatly improved (#557)
+- filemagic keyword performance was improved (#585)
+- fixes and improvements to daemon mode (#624)
+- fix drop rules not working correctly when thresholded (#613)
+- fixed a possible FP when a regular and "chopped" fast_pattern were the same (#581)
+- fix a false possitive condition in http_header (#607)
+- fix inaccuracy in byte_jump keyword when using "from_beginning" option (#627)
+- fixes to rule profiling (#576)
+- cleanups and misc fixes (#379, #395)
+- updated bundled libhtp to 0.2.11
+- build system improvements and cleanups
+- fix to SSL record parsing
+
+1.3.4 -- 2012-11-14
+
+- fix crash in flow and host engines in cases of low memory or low memcap settings (#617)
+- improve http handling in low memory conditions (#620)
+- fix inaccuracy in byte_jump keyword when using "from_beginning" option (#626)
+- fix building on OpenBSD 5.2
+- update default config's defrag settings to reflect all available options
+- fixes to make check
+- fix to SSL record parsing
+
+1.3.3 -- 2012-11-01
+
+- fix drop rules not working correctly when thresholded (#615)
+- fix a false possitive condition in http_header (#606)
+- fix extracted file corruption (#601)
+- fix a false possitive condition with the pcre keyword and relative matching (#588)
+- fix PF_RING set cluster problem on dma interfaces (#598)
+- improve http handling in low memory conditions (#586, #587)
+- fix FreeBSD inline mode crash (#612)
+- suppress pcre jit warning (#579)
+
+1.4beta2 -- 2012-10-04
+
+- New keyword: "luajit" to inspect packet, payload and all HTTP buffers with a Lua script (#346)
+- Added ability to control per server HTTP parser settings in much more detail (#503)
+- Rewrite of IP Defrag engine to improve performance and fix locking logic (#512, #540)
+- Big performance improvement in inspecting decoder, stream and app layer events (#555)
+- Pool performance improvements (#541)
+- Improved performance of signatures with simple pattern setups (#577)
+- Bundled docs are installed upon make install (#527)
+- Support for a number of global vs rule thresholds [3] was added (#425)
+- Improved rule profiling performance
+- If not explicit fast_pattern is set, pick HTTP patterns over stream patterns. HTTP method, stat code and stat msg are excluded.
+- Fix compilation on architectures other than x86 and x86_64 (#572)
+- Fix FP with anchored pcre combined with relative matching (#529)
+- Fix engine hanging instead of exitting if the pcap device doesn't exist (#533)
+- Work around for potential FP, will get properly fixed in next release (#574)
+- Improve ERF handling. Thanks to Jason Ish
+- Always set cluster_id in PF_RING
+- IPFW: fix broken broadcast handling
+- AF_PACKET kernel offset issue, IPS fix and cleanup
+- Fix stream engine sometimes resending the same data to app layer
+- Fix multiple issues in HTTP multipart parsing
+- Fixed a lockup at shutdown with NFQ (#537)
+
+1.3.2 -- 2012-10-03
+
+- Fixed a possible FP when a regular and "chopped" fast_pattern were the same (#562)
+- Fixed a FN condition with the flow:no_stream option (#575)
+- Fix building of perf profiling code on i386 platform. By Simon Moon (#534)
+- Fix multiple issues in HTTP multipart parsing
+- Fix stream engine sometimes resending the same data to app layer
+- Always set cluster_id in PF_RING
+- Defrag: silence some potentially noisy errors/warnings
+- IPFW: fix broken broadcast handling
+- AF_PACKET kernel offset issue
+
+1.4beta1 -- 2012-09-06
+
+- Custom HTTP logging contributed by Ignacio Sanchez (#530)
+- TLS certificate logging and fingerprint computation and keyword (#443)
+- TLS certificate store to disk feature (#444)
+- Decoding of IPv4-in-IPv6, IPv6-in-IPv6 and Teredo tunnels (#462, #514, #480)
+- AF_PACKET IPS support (#516)
+- Rules can be set to inspect only IPv4 or IPv6 (#494)
+- filesize keyword for matching on sizes of files in HTTP (#489)
+- Delayed detect initialization. Starts processing packets right away and loads detection engine in the background (#522)
+- NFQ fail open support (#507)
+- Highly experimental lua scripting support for detection
+- Live reloads now supports HTTP rule updates better (#522)
+- AF_PACKET performance improvements (#197, #415)
+- Make defrag more configurable (#517, #528)
+- Improve pool performance (#518)
+- Improve file inspection keywords by adding a separate API (#531)
+- Example threshold.config file provided (#302)
+- Fix building of perf profiling code on i386 platform. By Simon Moon (#534)
+- Various spelling corrections by Simon Moon (#533)
+
+1.3.1 -- 2012-08-21
+
+- AF_PACKET performance improvements
+- Defrag engine performance improvements
+- HTTP: add per server options to enable/disable double decoding of URI (#464, #504)
+- Stream engine packet handling for packets with non-standard flag combinations (#508)
+- Improved stream engine handling of packet loss (#523)
+- Stream engine checksum alerting fixed
+- Various rule analyzer fixes (#495, #496, #497)
+- (Rule) profiling fixed and improved (#460, #466)
+- Enforce limit on max-pending-packets (#510)
+- fast_pattern on negated content improved
+- TLS rule keyword parsing issues
+- Windows build fixes (#502)
+- Host OS parsing issues fixed (#499)
+- Reject signatures where content length is bigger than "depth" setting (#505)
+- Removed unused "prune-flows" option
+- Set main thread and live reload thread names (#498)
+
+1.3 -- 2012-07-06
+
+- make live rule reloads optional and disabled by default
+- fix a shutdown bug
+- fix several memory leaks (#492)
+- warn user if global and rule thresholding conflict (#455)
+- set thread names on FreeBSD (Nikolay Denev)
+- Fix PF_RING building on Ubuntu 12.04
+- rule analyzer updates
+- file inspection improvements when dealing with limits (#493)
+
+1.3rc1 -- 2012-06-29
+
+- experimental live rule reload by sending a USR2 signal (#279)
+- AF_PACKET BPF support (#449)
+- AF_PACKET live packet loss counters (#441)
+- Rule analyzer (#349)
+- add pcap workers runmode for use with libpcap wrappers that support load balancing, such as  Napatech's or Myricom's
+- negated filemd5 matching, allowing for md5 whitelisting
+- signatures with depth and/or offset are now checked against packets in addition to the stream (#404)
+- http_cookie keyword now also inspects "Set-Cookie" header (#479)
+- filemd5 keyword no longer depends on log-file output module (#447)
+- http_raw_header keyword inspects original header line terminators (#475)
+- deal with double encoded URI (#464)
+- improved SMB/SMB2/DCERPC robustness
+- ICMPv6 parsing fixes
+- improve HTTP body inspection
+- stream.inline accuracy issues fixed (#339)
+- general stability fixes (#482, #486)
+- missing unittests added (#471)
+- "threshold.conf not found" error made more clear (#446)
+- IPS mode segment logging for Unified2 improved
+
+1.3beta2 -- 2012-06-08
+
+- experimental support for matching on large lists of known file MD5 checksums
+- Improved performance for file_data, http_server_body and http_client_body keywords
+- Improvements to HTTP handling: multipart parsing, gzip decompression
+- Byte_extract can support negative offsets now (#445)
+- Support for PF_RING 5.4 added. Many thanks to Chris Wakelin (#459)
+- HOME_NET and EXTERNAL_NET and the other vars are now checked for common errors (#454)
+- Improved error reporting when using too long address strings (#451)
+- MD5 calculation improvements for daemon mode and other cases (#449)
+- File inspection scripts: Added Syslog action for logging to local syslog. Thanks to Martin Holste.
+- Rule parser is made more strict.
+- Unified2 output overhaul, logging individual segments in more cases.
+- detection_filter keyword accuracy problem was fixed (#453)
+- Don't inspect cookie header with http header (#461)
+- Crash with a rule with two byte_extract keywords (#456)
+- SSL parser fixes. Thanks to Chris Wakelin for testing the patches! (#476)
+- Accuracy issues in HTTP inspection fixed. Thanks to Rmkml (#452)
+- Improve escaping of some characters in logs (#418)
+- Checksum calculation bugs fixed
+- IPv6 parsing issues fixed. Thanks to Michel Saborde.
+- Endace DAG issues fixed. Thanks to Jason Ish from Endace.
+- Various OpenBSD related fixes.
+- Fixes for bugs found by Coverity source code analyzer.
+
+1.3beta1 -- 2012-04-04
+
+- TLS/SSL handshake parser, tls.subjectdn and tls.issuerdn keywords (#296, contributed by Pierre Chifflier)
+- Napatech capture card support (contributed by Randy Caldejon -- nPulse)
+- Scripts for looking up files / file md5's at Virus Total and others (contributed by Martin Holste)
+- Test mode: -T option to test the config (#271)
+- Ringbuffer and zero copy support for AF_PACKET
+- Commandline options to list supported app layer protocols and keywords (#344, #414)
+- File extraction for HTTP POST request that do not use multipart bodies
+- On the fly md5 checksum calculation of extracted files
+- Line based file log, in json format
+- Basic support for including other yaml files into the main yaml
+- New multi pattern engine: ac-bs
+- Profiling improvements, added lock profiling code
+- Improved HTTP CONNECT support in libhtp (#427, Brian Rectanus -- Qualys)
+- Unified yaml naming convention, including fallback support (by Nikolay Denev)
+- Improved Endace DAG support (#431, Jason Ish -- Endace)
+- New default runmode: "autofp" (#433)
+- Major rewrite of flow engine, improving scalability.
+- Improved http_stat_msg and http_stat_code keywords (#394)
+- Improved scalability for Tag and Threshold subsystems
+- Made the rule keyword parser much stricter in detecting syntax errors
+- Split "file" output into "file-store" and "file-log" outputs
+- Much improved file extraction
+- CUDA build fixes (#421)
+- Various FP's reported by Rmkml (#403, #405, #411)
+- IPv6 decoding and detection issues (reported by Michel Sarborde)
+- PCAP logging crash (#422)
+- Fixed many (potential) issues with the help of the Coverity source code analyzer
+- Fixed several (potential) issues with the help of the cppcheck and clang/scan-build source code analyzers
+
+1.2.1 -- 2012-01-20
+
+- fix malformed unified2 records when writing alerts trigger by stream inspection (#402)
+- only force a pseudo packet inspection cycle for TCP streams in a state >= established
+
+1.2 -- 2012-01-19
+
+- improved Windows/CYGWIN path handling (#387)
+- fixed some issues with passing an interface or ip address with -i
+- make live worker runmode threads adhere to the 'detect' cpu affinity settings
+
+1.2rc1 -- 2012-01-11
+
+- app-layer-events keyword: similar to the decoder-events and stream-events, this will allow matching on HTTP and SMTP events
+- auto detection of checksum offloading per interface (#311)
+- urilen options to match on raw or normalized URI (#341)
+- flow keyword option "only_stream" and "no_stream"
+- unixsock output options for all outputs except unified2 (PoC python script in the qa/ dir) (#250)
+- in IPS mode, reject rules now also drop (#399)
+- http_header now also inspects response headers (#389)
+- "worker" runmodes for NFQ and IPFW
+- performance improvement for "ac" pattern matcher
+- allow empty/non-initialized flowints to be incremented
+- PCRE-JIT is now enabled by default if available (#356)
+- many file inspection and extraction improvements
+- flowbits and flowints are now modified in a post-match action list
+- general performance increasements
+- fixed parsing really high sid numbers >2 Billion (#393)
+- fixed ICMPv6 not matching in IP-only sigs (#363)
+
+1.2beta1 -- 2011-12-19
+
+- File name, type inspection and extraction for HTTP
+- filename, fileext, filemagic and filestore keywords added
+- "file" output for storing extracted files to disk
+- file_data keyword support, inspecting normalized, dechunked, decompressed HTTP response body (feature #241
+- new keyword http_server_body, pcre regex /S option
+- Option to enable/disable core dumping from the suricata.yaml (enabled by default)
+- Human readable size limit settings in suricata.yaml
+- PF_RING bpf support (required PF_RING >= 5.1) (feature #334)
+- tos keyword support (feature #364)
+- IPFW IPS mode does now support multiple divert sockets
+- New IPS running modes, Linux and FreeBSD do now support "worker" and "autofp"
+- Improved alert accuracy in autofp and single runmodes
+- major performance optimizations for the ac-gfbs pattern matcher implementation
+- unified2 output fixes
+- PF_RING supports privilege dropping now (bug #367)
+- Improved detection of duplicate signatures
+
+1.1.1 -- 2011-12-07
+
+- Fix for a error in the smtp parser that could crash Suricata.
+- Fix for AF_PACKET not compiling on modern linux systems like Fedora 16.
+
+1.1 -- 2011-11-10
+
+- CUDA build fixed
+- minor pcap, AF_PACKET and PF_RING fixes (#368)
+- bpf handling fix
+- Windows CYGWIN build
+- more cleanups
+
+1.1rc1 -- 2011-11-03
+
+- extended HTTP request logging for use with (among other things) http_agent for Sguil (#38)
+- AF_PACKET report drop stats on shutdown (#325)
+- new counters in stats.log for flow and stream engines (#348)
+- SMTP parsing code support for BDAT command (#347)
+- HTTP URI normalization no longer converts to lowercase (#362)
+- AF_PACKET works with privileges dropping now (#361)
+- Prelude output for state matches (#264, #355)
+- update of the pattern matching code that should improve accuracy
+- rule parser was made more strict (#295, #312)
+- multiple event suppressions for the same SID was fixed (#366)
+- several accuracy fixes
+- removal of the unified1 output plugins (#353)
+
+1.1beta3 -- 2011-10-25
+
+- af-packet support for high speed packet capture
+- "replace" keyword support (#303)
+- new "workers" runmode for multi-dev and/or clustered PF_RING, AF_PACKET, pcap
+- added "stream-event" keyword to match on TCP session anomalies
+- support for suppress keyword was added (#274)
+- byte_extract keyword support was added
+- improved handling of timed out TCP sessions in the detection engine
+- unified2 payload logging if detection was in the HTTP state (#264)
+- improved accuracy of the HTTP transaction logging
+- support for larger (64 bit) Flow/Stream memcaps (#332)
+- major speed improvements for PCRE, including support for PCRE JIT
+- support setting flowbits in ip-only rules (#292)
+- performance increases on SSE3+ CPU's
+- overhaul of the packet acquisition subsystem
+- packet based performance profiling subsystem was added
+- TCP SACK support was added to the stream engine
+- updated included libhtp to 0.2.6 which fixes several issues
+
+1.1beta2 -- 2011-04-13
+
+- New keyword support: http_raw_uri (including /I for pcre), ssl_state, ssl_version (#258, #259, #260, #262).
+- Inline mode for the stream engine (#230, #248).
+- New keyword support: nfq_set_mark
+- Included an example decoder-events.rules file
+- api for adding and selecting runmodes was added
+- pcap logging / recording output was added
+- basic SCTP protocol parsing was added
+- more fine grained CPU affinity setting support was added
+- stream engine inspects stream in larger chunks
+- fast_pattern support for http_method content modifier (#255)
+- negation support for isdataat keyword (#257)
+- configurable interval for stats.log updates (#247)
+- new pf_ring runmode was added that scales better
+- pcap live mode now handles the monitor interface going up and down
+- several QA additions to "make check"
+- NFQ (linux inline) mode was improved
+- Alerts classification fix (#275)
+- compiles and runs on big-endian systems (#63)
+- unified2 output works around barnyard2 issues with DLT_RAW + IPv6
+
+1.1beta1 -- 2010-12-21
+
+- New keyword support: http_raw_header, http_stat_msg, http_stat_code.
+- A new default pattern matcher, Aho-Corasick based, that uses much less memory.
+- reference.config support as supplied by ET/ETpro and VRT.
+- Much improved fast_pattern support, including for http_uri, http_client_body, http_header, http_raw_header.
+- Improved parsers, especially the DCERPC parser.
+- Much improved performance & accuracy.
+
+1.0.5 -- 2011-07-25
+
+- Fix stream reassembly bug #300. Thanks to Rmkml for the report.
+- Fix several (potential) issues fixed after a source code scan with Coverity generously contributed by RedHat.
+
+1.0.4 -- 2011-06-24
+
+- LibHTP updated to 0.2.6
+- Large number of (potential) issues fixed after a source code scan with Coverity generously contributed by RedHat.
+- Large number of (potential) issues fixed after source code scans with the Clang static analizer.
+
+1.0.3 -- 2011-04-13
+
+- Fix broken checksum calculation for TCP/UDP in some cases
+- Fix errors in the byte_test, byte_jump, http_method and http_header keywords
+- Fix a ASN1 parsing issue
+- Improve LibHTP memory handling
+- Fix a defrag issue
+- Fix several stream engine issues
+
