@@ -277,6 +277,9 @@
 /* mPIPE support is available */
 #undef HAVE_MPIPE
 
+/* DPDK support is available */
+#undef HAVE_DPDK
+
 /* (Napatech capture card support) */
 #undef HAVE_NAPATECH
 

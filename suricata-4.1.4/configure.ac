@@ -1332,6 +1332,17 @@
     fi
     LIBS="${TMPLIBS}"
 
+  # dpdk support
+    # DPDK support is checked by `--enable_dpdk`
+    AC_ARG_ENABLE(dpdk,
+           AS_HELP_STRING([--enable-dpdk], [Enable DPDK support [default=no]]),
+                        ,[enable_dpdk=no])
+
+    AS_IF([test "x$enable_dpdk" = "xyes"], [
+        AC_DEFINE([HAVE_DPDK],[1],(DPDK support enabled))
+    ])
+    AM_CONDITIONAL([BUILD_DPDK], [test "x$enable_dpdk" = "xyes"])
+
   # libpfring
     # libpfring (currently only supported for libpcap enabled pfring)
     # Error on the side of caution. If libpfring enabled pcap is being used and we don't link against -lpfring compilation will fail.
@@ -2449,6 +2460,7 @@ AC_SUBST(PACKAGE_VERSION)
 AC_OUTPUT(Makefile src/Makefile rust/Makefile rust/Cargo.toml rust/.cargo/config qa/Makefile qa/coccinelle/Makefile rules/Makefile doc/Makefile doc/userguide/Makefile contrib/Makefile contrib/file_processor/Makefile contrib/file_processor/Action/Makefile contrib/file_processor/Processor/Makefile contrib/tile_pcie_logd/Makefile suricata.yaml etc/Makefile etc/suricata.logrotate etc/suricata.service python/Makefile python/suricata/config/defaults.py ebpf/Makefile)
 
 SURICATA_BUILD_CONF="Suricata Configuration:
+  DPDK_INTEL support:                      ${enable_dpdk}
   AF_PACKET support:                       ${enable_af_packet}
   eBPF support:                            ${enable_ebpf}
   XDP support:                             ${have_xdp}
