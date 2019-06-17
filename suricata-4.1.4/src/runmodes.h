@@ -26,6 +26,7 @@
 /* Run mode */
 enum RunModes {
     RUNMODE_UNKNOWN = 0,
+    RUNMODE_DPDK,
     RUNMODE_PCAP_DEV,
     RUNMODE_PCAP_FILE,
     RUNMODE_PFRING,
@@ -95,6 +96,7 @@ bool IsRunModeOffline(int run_mode_to_check);
 void RunModeEnablesBypassManager(void);
 int RunModeNeedsBypassManager(void);
 
+#include "runmode-dpdk.h"
 #include "runmode-pcap.h"
 #include "runmode-pcap-file.h"
 #include "runmode-pfring.h"

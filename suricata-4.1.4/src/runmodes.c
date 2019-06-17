@@ -138,6 +138,8 @@ static const char *RunModeTranslateModeToName(int runmode)
             return "UNITTEST";
         case RUNMODE_TILERA_MPIPE:
             return "MPIPE";
+        case RUNMODE_DPDK:
+            return "DPDK";
         case RUNMODE_AFP_DEV:
             return "AF_PACKET_DEV";
         case RUNMODE_NETMAP:
@@ -228,6 +230,7 @@ void RunModeRegisterRunModes(void)
     RunModeTileMpipeRegister();
     RunModeUnixSocketRegister();
     RunModeIpsWinDivertRegister();
+    RunModeDpdkRegister();
 #ifdef UNITTESTS
     UtRunModeRegister();
 #endif
@@ -320,6 +323,9 @@ void RunModeDispatch(int runmode, const char *custom_mode)
                 break;
             case RUNMODE_TILERA_MPIPE:
                 custom_mode = RunModeTileMpipeGetDefaultMode();
+                break;
+            case RUNMODE_DPDK:
+                custom_mode = RunModeDpdkGetDefaultMode();
                 break;
             case RUNMODE_NAPATECH:
                 custom_mode = RunModeNapatechGetDefaultMode();
