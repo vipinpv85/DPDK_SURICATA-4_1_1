@@ -179,6 +179,10 @@
 #include "rust-core-gen.h"
 #endif
 
+#ifdef HAVE_DPDK
+#include <rte_eal.h>
+#endif
+
 /*
  * we put this here, because we only use it here in main.
  */
@@ -659,6 +663,10 @@ static void PrintUsage(const char *progname)
 #ifdef HAVE_MPIPE
     printf("\t--mpipe                              : run with tilegx mpipe interface(s)\n");
 #endif
+#ifdef HAVE_DPDK
+    printf("\t--dpdk[=<file>]                      : run with DPDK mode with user config\n");
+    printf("\t--list-dpdkports                     : list DPDK availble ports\n");
+#endif
 #ifdef WINDIVERT
     printf("\t--windivert <filter>                 : run in inline WinDivert mode\n");
     printf("\t--windivert-forward <filter>         : run in inline WinDivert mode, as a gateway\n");
@@ -894,6 +902,8 @@ void RegisterAllModules(void)
     TmModuleReceiveMpipeRegister();
     TmModuleDecodeMpipeRegister();
 #endif
+#ifdef HAVE_DPDK
+#endif
     /* af-packet */
     TmModuleReceiveAFPRegister();
     TmModuleDecodeAFPRegister();
@@ -961,6 +971,19 @@ static TmEcode ParseInterfacesList(const int runmode, char *pcap_dev)
                 SCReturnInt(TM_ECODE_FAILED);
             }
         }
+#ifdef HAVE_DPDK
+    } else if (runmode == RUNMODE_DPDK) {
+        /* parse config file for DPDK */
+
+        /* init DPDK instance */
+
+        /* Identify the ports with DPDK */
+        if (GetDpdkPort() == 0) {
+            fprintf(stderr, "ERROR: No DPDK ports found!\n");
+            SCReturnInt(TM_ECODE_FAILED);
+        } else
+            printf(" Found DPDK ports\n");
+#endif
 #ifdef HAVE_MPIPE
     } else if (runmode == RUNMODE_TILERA_MPIPE) {
         if (strlen(pcap_dev)) {
@@ -1450,6 +1473,11 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
     g_ut_covered = 0;
 #endif
 
+#ifdef HAVE_DPDK
+    int list_dpdk_ports = 0;
+    int dpdk_init = 0;
+#endif
+
     struct option long_opts[] = {
         {"dump-config", 0, &dump_config, 1},
         {"pfring", optional_argument, 0, 0},
@@ -1535,6 +1563,10 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
         {"build-info", 0, &build_info, 1},
 #ifdef HAVE_MPIPE
         {"mpipe", optional_argument, 0, 0},
+#endif
+#ifdef HAVE_DPDK
+        {"dpdk", required_argument, 0, 0},
+        {"list-dpdkports", 0, &list_dpdk_ports, 1},
 #endif
 #ifdef WINDIVERT
         {"windivert", required_argument, 0, 0},
@@ -1821,6 +1853,33 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
                 }
             }
 #endif
+            else if(strcmp((long_opts[option_index]).name , "dpdk") == 0) {
+#ifdef HAVE_DPDK
+                if (suri->run_mode == RUNMODE_UNKNOWN) {
+                    suri->run_mode = RUNMODE_DPDK;
+                    SCLogInfo(" DPDK Mode selected\n");
+
+                    SCLogDebug(" parse DPDK user config File (%s)", optarg);
+                    void *cfg_ptr = ParseDpdkConfig(optarg);
+                    if (cfg_ptr == NULL) {
+                        SCLogError(SC_ERR_DPDK_CONFIG,
+                               " File (%s) has config issue!\n", optarg);
+                        exit(EXIT_FAILURE);
+                    } else {
+                        memset(suri->pcap_dev, 0, sizeof(suri->pcap_dev));
+                        LiveRegisterDeviceName(optarg);
+                    }
+                } else {
+                    SCLogError(SC_ERR_MULTIPLE_RUN_MODE,
+                               "more than one run mode has been specified");
+                    PrintUsage(argv[0]);
+                    exit(EXIT_FAILURE);
+                }
+#else
+                SCLogError(SC_ERR_DPDK_NOSUPPORT,"DPDK not enabled. Make sure to pass --enable-dpdk to configure when building.");
+                return TM_ECODE_FAILED;
+#endif
+            }
             else if(strcmp((long_opts[option_index]).name, "windivert-forward") == 0) {
 #ifdef WINDIVERT
                 if (suri->run_mode == RUNMODE_UNKNOWN) {
@@ -2139,6 +2198,10 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
         suri->run_mode = RUNMODE_CONF_TEST;
     if (engine_analysis)
         suri->run_mode = RUNMODE_ENGINE_ANALYSIS;
+#ifdef HAVE_DPDK
+    if (list_dpdk_ports)
+        suri->run_mode = RUNMODE_DPDK_LISTPORTS;
+#endif
 
     suri->offline = IsRunModeOffline(suri->run_mode);
 
@@ -2358,6 +2421,11 @@ void PostRunDeinit(const int runmode, struct timeval *start_time)
 
 static int StartInternalRunMode(SCInstance *suri, int argc, char **argv)
 {
+#ifdef HAVE_DPDK
+    #define DPDK_LIST_PORTS 6
+    char* argument[DPDK_LIST_PORTS] = {"./suricata","-c","1", "--log-level", "eal,8", NULL};
+#endif
+
     /* Treat internal running mode */
     switch(suri->run_mode) {
         case RUNMODE_LIST_KEYWORDS:
@@ -2402,6 +2470,16 @@ static int StartInternalRunMode(SCInstance *suri, int argc, char **argv)
             SCLogInfo("Suricata service startup parameters has been successfuly changed.");
             return TM_ECODE_DONE;
 #endif /* OS_WIN32 */
+#ifdef HAVE_DPDK
+        case RUNMODE_DPDK:
+            if (rte_eal_init(DPDK_LIST_PORTS - 1, (char **)argument))
+                ListDpdkPorts();
+            return TM_ECODE_DONE;
+        case RUNMODE_DPDK_LISTPORTS:
+            if (rte_eal_init(DPDK_LIST_PORTS - 1, (char **)argument))
+                ListDpdkPorts();
+            return TM_ECODE_DONE;
+#endif
         default:
             /* simply continue for other running mode */
             break;

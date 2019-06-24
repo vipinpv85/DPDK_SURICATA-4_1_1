@@ -27,14 +27,14 @@
  *
  * DPDK runmode support
  */
-
 #ifndef __RUNMODE_DPDK_H__
 #define __RUNMODE_DPDK_H__
-
-#include "suricata-common.h"
 
 const char *RunModeDpdkGetDefaultMode(void);
 void RunModeDpdkRegister(void);
 int RunModeDpdkWorkers(void);
+uint16_t GetDpdkPort(void);
+void ListDpdkPorts(void);
+void *ParseDpdkConfig(const char *iface);
 
 #endif  /* __RUNMODE_DPDK_H__ */

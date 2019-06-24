@@ -1339,7 +1339,22 @@
                         ,[enable_dpdk=no])
 
     AS_IF([test "x$enable_dpdk" = "xyes"], [
+        enable_af_packet="no"
+
         AC_DEFINE([HAVE_DPDK],[1],(DPDK support enabled))
+
+        if test -f ${RTE_SDK}/${RTE_TARGET}/include/rte_eal.h; then
+            DPDK_CFLAGS=" -DHAVE_DPDK -I${RTE_SDK}/${RTE_TARGET}/include/ -include ${RTE_SDK}/${RTE_TARGET}/include/rte_config.h "
+            AC_SUBST(DPDK_CFLAGS)
+            echo " Added configuration for DPDK CFLAGS"
+
+            DPDK_LDFLAGS=" -pthread -Wl,--no-as-needed -Wl,-export-dynamic -L${RTE_SDK}/${RTE_TARGET}/lib/ -Wl,-lrte_flow_classify -Wl,-lrte_pipeline -Wl,-lrte_table -Wl,-lrte_port -Wl,-lrte_pdump -Wl,-lrte_distributor -Wl,-lrte_ip_frag -Wl,-lrte_gro -Wl,-lrte_gso -Wl,-lrte_meter -Wl,-lrte_lpm -Wl,--whole-archive -Wl,-lrte_acl -Wl,--no-whole-archive -Wl,-lrte_jobstats -Wl,-lrte_metrics -Wl,-lrte_bitratestats -Wl,-lrte_latencystats -Wl,-lrte_power -Wl,-lrte_timer -Wl,-lrte_efd -Wl,--whole-archive -Wl,-lrte_cfgfile -Wl,-lrte_hash -Wl,-lrte_member -Wl,-lrte_vhost -Wl,-lrte_kvargs -Wl,-lrte_mbuf -Wl,-lrte_net -Wl,-lrte_ethdev -Wl,-lrte_cryptodev -Wl,-lrte_security -Wl,-lrte_eventdev -Wl,-lrte_mempool -Wl,-lrte_mempool_ring -Wl,-lrte_ring -Wl,-lrte_pci -Wl,-lrte_eal -Wl,-lrte_cmdline -Wl,-lrte_reorder -Wl,-lrte_sched -Wl,-lrte_kni -Wl,-lrte_bus_pci -Wl,-lrte_bus_vdev -Wl,-lrte_mempool_stack -Wl,-lrte_pmd_af_packet -Wl,-lrte_pmd_bond -Wl,-lrte_pmd_e1000 -Wl,-lrte_pmd_failsafe -Wl,-lrte_pmd_i40e -Wl,-lrte_pmd_ixgbe -Wl,-lrte_pmd_kni -Wl,-lrte_pmd_null -Wl,-lrte_pmd_ring -Wl,-lrte_pmd_softnic -Wl,-lrte_pmd_tap -Wl,-lrte_pmd_virtio -Wl,-lrte_pmd_vhost -Wl,-lrte_pmd_null_crypto -Wl,-lrte_pmd_crypto_scheduler -Wl,-lrte_pmd_skeleton_event -Wl,-lrte_pmd_sw_event -Wl,--no-whole-archive -Wl,-lrt -Wl,-lm -Wl,-lnuma -Wl,-ldl -Wl,-export-dynamic -Wl,--as-needed -Wl, ${RTE_SDK}/${RTE_TARGET}/lib/libdpdk.a "
+            echo " Added configuration for DPDK LDFLAGS"
+            AC_SUBST(DPDK_LDFLAGS)
+        fi
+
+        echo " Added configuration for DPDK"
+        echo ""
     ])
     AM_CONDITIONAL([BUILD_DPDK], [test "x$enable_dpdk" = "xyes"])
 
@@ -2460,7 +2475,7 @@ AC_SUBST(PACKAGE_VERSION)
 AC_OUTPUT(Makefile src/Makefile rust/Makefile rust/Cargo.toml rust/.cargo/config qa/Makefile qa/coccinelle/Makefile rules/Makefile doc/Makefile doc/userguide/Makefile contrib/Makefile contrib/file_processor/Makefile contrib/file_processor/Action/Makefile contrib/file_processor/Processor/Makefile contrib/tile_pcie_logd/Makefile suricata.yaml etc/Makefile etc/suricata.logrotate etc/suricata.service python/Makefile python/suricata/config/defaults.py ebpf/Makefile)
 
 SURICATA_BUILD_CONF="Suricata Configuration:
-  DPDK_INTEL support:                      ${enable_dpdk}
+  DPDK support:                            ${enable_dpdk}
   AF_PACKET support:                       ${enable_af_packet}
   eBPF support:                            ${enable_ebpf}
   XDP support:                             ${have_xdp}
