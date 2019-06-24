@@ -15,7 +15,6 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 
 ### modified suricata:
  - run `autoconf`
- - run `automake`
  - to configure with dpdk support pass `--enable-dpdk` to `./configure`
  - to build `make -j all`
  - test with `./src/suricata --list-runmodes`
