@@ -45,8 +45,13 @@
 #include "util-device.h"
 
 #ifdef HAVE_DPDK
+#define SUIRCATA_DPDK_MAXARGS 16
+
 /* Number of configured parallel pipelines. */
 int dpdk_num_pipelines;
+
+uint16_t argument_count = 1;
+char argument[SUIRCATA_DPDK_MAXARGS][32] = {{"./dpdk-suricata"}, {""}};
 #endif
 
 /*
@@ -78,11 +83,30 @@ void *ParseDpdkConfig(const char *dpdkCfg)
 #ifdef HAVE_DPDK
 	struct rte_cfgfile *file = rte_cfgfile_load(dpdkCfg, 0);
 
-	printf(" ParseDpdkConfig %p\n", file);
+	/* get section name EAL */
+	if (rte_cfgfile_has_section(file, "EAL")) {
+		SCLogDebug(" section (EAL); count %d\n", rte_cfgfile_num_sections(file, "EAL", sizeof("EAL") - 1));
+		SCLogDebug(" section (EAL) has entries %d\n", rte_cfgfile_section_num_entries(file, "EAL"));
 
+		int n_entries = rte_cfgfile_section_num_entries(file, "EAL");
+		struct rte_cfgfile_entry entries[n_entries];
+
+		rte_cfgfile_section_entries(file, "EAL", entries, n_entries);
+		argument_count += n_entries * 2;
+		SCLogDebug(" argument_count %d\n", argument_count);
+
+		for (int i = 0; i < n_entries; i++) {
+			SCLogDebug(" - entries[i].name: (%s) entries[i].value: (%s)\n", entries[i].name, entries[i].value);
+			snprintf(argument[i * 2 + 1], 32, "%s", entries[i].name);
+			snprintf(argument[i * 2 + 2], 32, "%s", entries[i].value);
+			SCLogDebug(" - argument: (%s) (%s)\n", argument[i * 2 + 1], argument[i * 2 + 2]);
+		}
+	}
+
+	rte_cfgfile_close(file);
 	return file;
 #else
-	printf(" not configured for ParseDpdkConfig\n");
+	SCLogInfo(" not configured for ParseDpdkConfig\n");
 
 	return NULL;
 #endif
@@ -114,15 +138,15 @@ uint16_t GetDpdkPort(void)
 void ListDpdkPorts(void)
 {
 #ifndef HAVE_DPDK
-	printf("\n DPDK not supported!");
+	SCLogError("\n DPDK not supported!");
 #else
 	uint16_t nb_ports = 0, i = 0;
 
 	if (RTE_PROC_INVALID != rte_eal_process_type()) {
 		nb_ports = rte_eth_dev_count_avail();
 
-		printf("\n\n --- DPDK Ports ---");
-		printf("\n  - Overall Ports: %d ", nb_ports);
+		SCLogInfo("\n\n --- DPDK Ports ---");
+		SCLogInfo("\n  - Overall Ports: %d ", nb_ports);
 
 		for (; i < nb_ports; i++) {
 			uint16_t mtu;

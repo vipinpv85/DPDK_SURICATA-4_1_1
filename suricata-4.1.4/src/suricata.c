@@ -180,7 +180,12 @@
 #endif
 
 #ifdef HAVE_DPDK
-#include <rte_eal.h>
+#include "source-dpdk.h"
+
+extern uint16_t argument_count;
+extern char argument[SUIRCATA_DPDK_MAXARGS][32];
+
+char *args[SUIRCATA_DPDK_MAXARGS];
 #endif
 
 /*
@@ -1475,7 +1480,6 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
 
 #ifdef HAVE_DPDK
     int list_dpdk_ports = 0;
-    int dpdk_init = 0;
 #endif
 
     struct option long_opts[] = {
@@ -1859,15 +1863,14 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
                     suri->run_mode = RUNMODE_DPDK;
                     SCLogInfo(" DPDK Mode selected\n");
 
+                    memset(suri->pcap_dev, 0, sizeof(suri->pcap_dev));
+
                     SCLogDebug(" parse DPDK user config File (%s)", optarg);
                     void *cfg_ptr = ParseDpdkConfig(optarg);
                     if (cfg_ptr == NULL) {
                         SCLogError(SC_ERR_DPDK_CONFIG,
                                " File (%s) has config issue!\n", optarg);
                         exit(EXIT_FAILURE);
-                    } else {
-                        memset(suri->pcap_dev, 0, sizeof(suri->pcap_dev));
-                        LiveRegisterDeviceName(optarg);
                     }
                 } else {
                     SCLogError(SC_ERR_MULTIPLE_RUN_MODE,
@@ -2421,11 +2424,6 @@ void PostRunDeinit(const int runmode, struct timeval *start_time)
 
 static int StartInternalRunMode(SCInstance *suri, int argc, char **argv)
 {
-#ifdef HAVE_DPDK
-    #define DPDK_LIST_PORTS 6
-    char* argument[DPDK_LIST_PORTS] = {"./suricata","-c","1", "--log-level", "eal,8", NULL};
-#endif
-
     /* Treat internal running mode */
     switch(suri->run_mode) {
         case RUNMODE_LIST_KEYWORDS:
@@ -2471,12 +2469,9 @@ static int StartInternalRunMode(SCInstance *suri, int argc, char **argv)
             return TM_ECODE_DONE;
 #endif /* OS_WIN32 */
 #ifdef HAVE_DPDK
-        case RUNMODE_DPDK:
-            if (rte_eal_init(DPDK_LIST_PORTS - 1, (char **)argument))
-                ListDpdkPorts();
-            return TM_ECODE_DONE;
         case RUNMODE_DPDK_LISTPORTS:
-            if (rte_eal_init(DPDK_LIST_PORTS - 1, (char **)argument))
+            args[0] = argument[0];
+            if (InitDpdkSuricata(1, args))
                 ListDpdkPorts();
             return TM_ECODE_DONE;
 #endif
