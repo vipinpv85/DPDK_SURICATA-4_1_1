@@ -978,16 +978,21 @@ static TmEcode ParseInterfacesList(const int runmode, char *pcap_dev)
         }
 #ifdef HAVE_DPDK
     } else if (runmode == RUNMODE_DPDK) {
-        /* parse config file for DPDK */
-
         /* init DPDK instance */
+        for (int j = 0; j < argument_count; j++)
+           args[j] = argument[j];
 
-        /* Identify the ports with DPDK */
-        if (GetDpdkPort() == 0) {
-            fprintf(stderr, "ERROR: No DPDK ports found!\n");
+        if (InitDpdkSuricata(argument_count, (char **)args)) {
+            /* Identify the ports with DPDK */
+            if (GetDpdkPort() == 0) {
+                SCLogError(SC_ERR_DPDK_CONFIG, " No DPDK ports found\n");
+                SCReturnInt(TM_ECODE_FAILED);
+            } else
+                SCLogInfo(" Found DPDK ports\n");
+        } else {
+            SCLogError(SC_ERR_DPDK_CONFIG, " failed to initialize DPDK\n");
             SCReturnInt(TM_ECODE_FAILED);
-        } else
-            printf(" Found DPDK ports\n");
+        }
 #endif
 #ifdef HAVE_MPIPE
     } else if (runmode == RUNMODE_TILERA_MPIPE) {
