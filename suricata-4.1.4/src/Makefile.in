@@ -292,20 +292,20 @@ am_suricata_OBJECTS = alert-debuglog.$(OBJEXT) alert-fastlog.$(OBJEXT) \
 	output-json.$(OBJEXT) output-json-common.$(OBJEXT) \
 	packet-queue.$(OBJEXT) pkt-var.$(OBJEXT) reputation.$(OBJEXT) \
 	respond-reject.$(OBJEXT) respond-reject-libnet11.$(OBJEXT) \
-	runmode-af-packet.$(OBJEXT) runmode-erf-dag.$(OBJEXT) \
-	runmode-erf-file.$(OBJEXT) runmode-ipfw.$(OBJEXT) \
-	runmode-napatech.$(OBJEXT) runmode-netmap.$(OBJEXT) \
-	runmode-nfq.$(OBJEXT) runmode-nflog.$(OBJEXT) \
-	runmode-pcap.$(OBJEXT) runmode-pcap-file.$(OBJEXT) \
-	runmode-pfring.$(OBJEXT) runmode-unittests.$(OBJEXT) \
-	runmode-unix-socket.$(OBJEXT) runmode-tile.$(OBJEXT) \
-	runmode-windivert.$(OBJEXT) runmodes.$(OBJEXT) \
-	source-af-packet.$(OBJEXT) source-erf-dag.$(OBJEXT) \
-	source-erf-file.$(OBJEXT) source-ipfw.$(OBJEXT) \
-	source-mpipe.$(OBJEXT) source-napatech.$(OBJEXT) \
-	source-netmap.$(OBJEXT) source-nfq.$(OBJEXT) \
-	source-nflog.$(OBJEXT) source-pcap.$(OBJEXT) \
-	source-pcap-file.$(OBJEXT) \
+	runmode-af-packet.$(OBJEXT) runmode-dpdk.$(OBJEXT) \
+	runmode-erf-dag.$(OBJEXT) runmode-erf-file.$(OBJEXT) \
+	runmode-ipfw.$(OBJEXT) runmode-napatech.$(OBJEXT) \
+	runmode-netmap.$(OBJEXT) runmode-nfq.$(OBJEXT) \
+	runmode-nflog.$(OBJEXT) runmode-pcap.$(OBJEXT) \
+	runmode-pcap-file.$(OBJEXT) runmode-pfring.$(OBJEXT) \
+	runmode-unittests.$(OBJEXT) runmode-unix-socket.$(OBJEXT) \
+	runmode-tile.$(OBJEXT) runmode-windivert.$(OBJEXT) \
+	runmodes.$(OBJEXT) source-af-packet.$(OBJEXT) \
+	source-erf-dag.$(OBJEXT) source-erf-file.$(OBJEXT) \
+	source-ipfw.$(OBJEXT) source-mpipe.$(OBJEXT) \
+	source-napatech.$(OBJEXT) source-netmap.$(OBJEXT) \
+	source-nfq.$(OBJEXT) source-nflog.$(OBJEXT) \
+	source-pcap.$(OBJEXT) source-pcap-file.$(OBJEXT) \
 	source-pcap-file-directory-helper.$(OBJEXT) \
 	source-pcap-file-helper.$(OBJEXT) source-pfring.$(OBJEXT) \
 	source-windivert.$(OBJEXT) stream.$(OBJEXT) \
@@ -469,6 +469,8 @@ CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
 DEPDIR = @DEPDIR@
 DLLTOOL = @DLLTOOL@
+DPDK_CFLAGS = @DPDK_CFLAGS@
+DPDK_LDFLAGS = @DPDK_LDFLAGS@
 DSYMUTIL = @DSYMUTIL@
 DUMPBIN = @DUMPBIN@
 ECHO_C = @ECHO_C@
@@ -994,6 +996,7 @@ reputation.c reputation.h \
 respond-reject.c respond-reject.h \
 respond-reject-libnet11.h respond-reject-libnet11.c \
 runmode-af-packet.c runmode-af-packet.h \
+runmode-dpdk.c runmode-dpdk.h \
 runmode-erf-dag.c runmode-erf-dag.h \
 runmode-erf-file.c runmode-erf-file.h \
 runmode-ipfw.c runmode-ipfw.h \
@@ -1168,12 +1171,12 @@ AM_CPPFLAGS = $(all_includes)
 
 # the library search path.
 suricata_LDFLAGS = $(all_libraries) ${SECLDFLAGS}
-suricata_LDADD = $(HTP_LDADD) $(RUST_LDADD)
+suricata_LDADD = $(HTP_LDADD) $(RUST_LDADD) ${DPDK_LDFLAGS}
 @HAVE_RUST_TRUE@suricata_DEPENDENCIES = $(RUST_SURICATA_LIB)
 
 # default CFLAGS
 AM_CFLAGS = ${OPTIMIZATION_CFLAGS} ${GCC_CFLAGS} ${CLANG_CFLAGS} \
-	${SECCFLAGS} ${PCAP_CFLAGS} \
+	${SECCFLAGS} ${PCAP_CFLAGS} ${DPDK_CFLAGS} \
 	-DLOCAL_STATE_DIR=\"$(localstatedir)\" -std=gnu99 -Wall \
 	-Wno-unused-parameter -Wmissing-prototypes \
 	-Wmissing-declarations -Wstrict-prototypes -Wwrite-strings \
@@ -1193,9 +1196,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu src/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign src/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu src/Makefile
+	  $(AUTOMAKE) --foreign src/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -1615,6 +1618,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/respond-reject-libnet11.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/respond-reject.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/runmode-af-packet.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/runmode-dpdk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/runmode-erf-dag.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/runmode-erf-file.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/runmode-ipfw.Po@am__quote@
