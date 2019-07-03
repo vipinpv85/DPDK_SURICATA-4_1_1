@@ -22,11 +22,16 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 - Test the custom build by cross checking examples like helloworld & l2fwd.
 
 #### modified suricata:
- - run `autoconf`
- - to configure with dpdk support pass `--enable-dpdk` to `./configure`
- - to build `make -j all`
- - test with `./src/suricata --list-runmodes`
+
+| steps | explanation |
+| -----|-----|
+| `autoconf` | to build the configure script with DPDK support |
+| `./configure --enable-dpdk` | makes configuration with dpdk |
+| `make -j 10` | build suricata with 10 threads |
 
 ## How to Run?
- - list DPDK ports `./suricata --list-dpdkports`
- - run application `./suricata --dpdk=<path to to config>/mysuricata.cfg`
+
+| command | purpose |
+| -----|-----|
+| `./src/suricata --list-runmodes` | list DPDK available ports |
+| `./src/suricata --dpdk=<path to to config>/mysuricata.cfg` | Run DPDK suircata with mysuricata.cfg |
