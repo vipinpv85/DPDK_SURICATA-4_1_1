@@ -1884,7 +1884,7 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
                     exit(EXIT_FAILURE);
                 }
 #else
-                SCLogError(SC_ERR_DPDK_NOSUPPORT,"DPDK not enabled. Make sure to pass --enable-dpdk to configure when building.");
+                SCLogError(SC_ERR_INITIALIZATION, "DPDK not enabled. Make sure to pass --enable-dpdk to configure when building.");
                 return TM_ECODE_FAILED;
 #endif
             }

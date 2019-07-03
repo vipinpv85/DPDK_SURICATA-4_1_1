@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 
+#if HAVE_DPDK
 #include <rte_common.h>
 #include <rte_byteorder.h>
 #include <rte_log.h>
@@ -35,5 +36,6 @@
 #include <rte_version.h>
 #include <rte_tailq.h>
 #include <rte_cfgfile.h>
+#endif
 
 #endif /*__DPDK_INCLUDE_COMMON__*/

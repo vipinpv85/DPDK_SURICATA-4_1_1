@@ -62,11 +62,13 @@ static const char *dpdk_default_mode = "workers";
 
 const char *RunModeDpdkGetDefaultMode(void)
 {
-    return dpdk_default_mode;
+	SCEnter();
+	return dpdk_default_mode;
 }
 
 void RunModeDpdkRegister(void)
 {
+	SCEnter();
 #ifdef HAVE_DPDK
     RunModeRegisterNewRunMode(RUNMODE_DPDK, "workers",
                               "Workers dpdk mode, each thread does all"
@@ -80,8 +82,11 @@ void RunModeDpdkRegister(void)
 
 void *ParseDpdkConfig(const char *dpdkCfg)
 {
+	SCEnter();
 #ifdef HAVE_DPDK
-	struct rte_cfgfile *file = rte_cfgfile_load(dpdkCfg, 0);
+	struct rte_cfgfile *file = NULL;
+
+	file = rte_cfgfile_load(dpdkCfg, 0);
 
 	/* get section name EAL */
 	if (rte_cfgfile_has_section(file, "EAL")) {
@@ -104,6 +109,7 @@ void *ParseDpdkConfig(const char *dpdkCfg)
 	}
 
 	rte_cfgfile_close(file);
+
 	return file;
 #else
 	SCLogInfo(" not configured for ParseDpdkConfig\n");
@@ -132,13 +138,19 @@ int RunModeDpdkWorkers(void)
 
 uint16_t GetDpdkPort(void)
 {
+#ifdef HAVE_DPDK
+	SCEnter();
 	return rte_eth_dev_count_avail();
+#else
+	return 0;
+#endif
 }
 
 void ListDpdkPorts(void)
 {
+	SCEnter();
 #ifndef HAVE_DPDK
-	SCLogError("\n DPDK not supported!");
+	fprintf(stderr, "\n ERROR: DPDK not supported!");
 #else
 	uint16_t nb_ports = 0, i = 0;
 
