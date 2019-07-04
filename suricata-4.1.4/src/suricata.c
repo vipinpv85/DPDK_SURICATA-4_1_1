@@ -1862,7 +1862,7 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
                 }
             }
 #endif
-            else if(strcmp((long_opts[option_index]).name , "dpdk") == 0) {
+            else if(strcmp((long_opts[option_index]).name, "dpdk") == 0) {
 #ifdef HAVE_DPDK
                 if (suri->run_mode == RUNMODE_UNKNOWN) {
                     suri->run_mode = RUNMODE_DPDK;
@@ -3067,12 +3067,23 @@ int main(int argc, char **argv)
 
 #ifdef HAVE_DPDK
     if (suricata.run_mode == RUNMODE_DPDK) {
-        SCLogNotice(" Read DPDK contents YAML file.\n");
-        SCLogNotice(" Check for ACL offlaod for DPDK RX-TX.\n");
-        SCLogNotice(" Check for reassembly-fragemnt offlaod for DPDK.\n");
+        SCLogDebug(" Read DPDK contents YAML file.\n");
+        if (ParseDpdkYaml()) {
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to read content DPDK!\n");
+            exit(EXIT_FAILURE);
+        }
 
-        SCLogNotice(" Setup port based on PORT-X with Jumbo, mbuf size and RSS.\n");
-        SCLogNotice(" HW offload if any.\n");
+        SCLogDebug(" Check for ACL offlaod for DPDK RX-TX.\n");
+        if (CreateDpdkAcl()) {
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ACL DPDK!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        SCLogDebug(" Check for reassembly-fragemnt offlaod for DPDK.\n");
+        if (CreateDpdkReassemblyFragement()) {
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ReassemblyFragement DPDK!\n");
+            exit(EXIT_FAILURE);
+        }
     }
 #endif
 

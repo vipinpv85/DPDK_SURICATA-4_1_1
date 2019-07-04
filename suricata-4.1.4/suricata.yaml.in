@@ -1820,13 +1820,11 @@ dpdk:
   pre-acl: yes
   post-acl: yes
   tx-fragment: no
-  rx-reassemnle: no
+  rx-reassemble: no
   # IDS, IPS, HYBRID (new mode)
   mode: IDS
   # DPDK port index
-  input-output-map:
-  - interface: 0, 0
-  - interface: 1, 1
+  input-output-map: ["0-0", "1-1"]
 
 # Tilera mpipe configuration. for use on Tilera TILE-Gx.
 mpipe:

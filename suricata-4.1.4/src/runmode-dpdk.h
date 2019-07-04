@@ -30,11 +30,33 @@
 #ifndef __RUNMODE_DPDK_H__
 #define __RUNMODE_DPDK_H__
 
+typedef struct
+{
+	uint8_t rxq_count;
+	uint8_t txq_count;
+	uint16_t mtu;
+	uint8_t rss_tuple:2;
+	uint8_t jumbo:1;
+} DpdkPortConfig_t;
+
+typedef struct
+{
+	uint16_t pre_acl:1;
+	uint16_t post_acl:1;
+	uint16_t tx_fragment:1;
+	uint16_t rx_reassemble:1;
+	uint16_t mode:2;
+	uint16_t portmap[RTE_MAX_ETHPORTS][2];
+} DpdkConfig_t;
+
 const char *RunModeDpdkGetDefaultMode(void);
 void RunModeDpdkRegister(void);
 int RunModeDpdkWorkers(void);
 uint16_t GetDpdkPort(void);
 void ListDpdkPorts(void);
-void *ParseDpdkConfig(const char *iface);
+void *ParseDpdkConfig(const char *file);
+int ParseDpdkYaml(void);
+int CreateDpdkAcl(void);
+int CreateDpdkReassemblyFragement(void);
 
 #endif  /* __RUNMODE_DPDK_H__ */
