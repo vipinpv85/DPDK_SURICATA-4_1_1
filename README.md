@@ -21,10 +21,10 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 - use `make config T=x86_64-native-linuxapp-gcc O=x86_64-native-linuxapp-gcc`.
 - Execute 
 ```
- -- export RTE_SDK=$PWD
- -- export RTE_TARGET=x86_64-native-linuxapp-gcc
- -- cd x86_64-native-linuxapp-gcc
- -- make -j 4
+ export RTE_SDK=$PWD
+ export RTE_TARGET=x86_64-native-linuxapp-gcc
+ cd x86_64-native-linuxapp-gcc
+ make -j 4
  ```
 - Test the custom build by cross checking examples like helloworld & l2fwd.
 
