@@ -2476,8 +2476,10 @@ static int StartInternalRunMode(SCInstance *suri, int argc, char **argv)
 #ifdef HAVE_DPDK
         case RUNMODE_DPDK_LISTPORTS:
             args[0] = argument[0];
-            if (InitDpdkSuricata(1, args))
+            if (InitDpdkSuricata(1, args) >= 0)
                 ListDpdkPorts();
+            else
+                SCLogError(SC_ERR_DPDK_CONFIG, " DPDK init failed\n");
             return TM_ECODE_DONE;
 #endif
         default:
@@ -3062,6 +3064,17 @@ int main(int argc, char **argv)
         ConfDump();
         exit(EXIT_SUCCESS);
     }
+
+#ifdef HAVE_DPDK
+    if (suricata.run_mode == RUNMODE_DPDK) {
+        SCLogNotice(" Read DPDK contents YAML file.\n");
+        SCLogNotice(" Check for ACL offlaod for DPDK RX-TX.\n");
+        SCLogNotice(" Check for reassembly-fragemnt offlaod for DPDK.\n");
+
+        SCLogNotice(" Setup port based on PORT-X with Jumbo, mbuf size and RSS.\n");
+        SCLogNotice(" HW offload if any.\n");
+    }
+#endif
 
     /* Since our config is now loaded we can finish configurating the
      * logging module. */

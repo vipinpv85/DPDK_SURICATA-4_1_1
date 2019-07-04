@@ -138,8 +138,8 @@ int RunModeDpdkWorkers(void)
 
 uint16_t GetDpdkPort(void)
 {
-#ifdef HAVE_DPDK
 	SCEnter();
+#ifdef HAVE_DPDK
 	return rte_eth_dev_count_avail();
 #else
 	return 0;
@@ -150,10 +150,11 @@ void ListDpdkPorts(void)
 {
 	SCEnter();
 #ifndef HAVE_DPDK
-	fprintf(stderr, "\n ERROR: DPDK not supported!");
+	SCLogInfo("\n ERROR: DPDK not supported!");
 #else
 	uint16_t nb_ports = 0, i = 0;
 
+	SCLogDebug("\n DPDK supported!");
 	if (RTE_PROC_INVALID != rte_eal_process_type()) {
 		nb_ports = rte_eth_dev_count_avail();
 

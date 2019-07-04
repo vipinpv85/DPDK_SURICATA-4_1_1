@@ -1814,6 +1814,20 @@ napatech:
     #   a range of streams (e.g. streams: ["0-3"])
     streams: ["0-3"]
 
+# DPDK configuration. for use on DPDK instance
+dpdk:
+
+  pre-acl: yes
+  post-acl: yes
+  tx-fragment: no
+  rx-reassemnle: no
+  # IDS, IPS, HYBRID (new mode)
+  mode: IDS
+  # DPDK port index
+  input-output-map:
+  - interface: 0, 0
+  - interface: 1, 1
+
 # Tilera mpipe configuration. for use on Tilera TILE-Gx.
 mpipe:
 
