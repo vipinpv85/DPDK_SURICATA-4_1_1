@@ -10,8 +10,8 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
  - https://suricata.readthedocs.io/en/suricata-4.1.2/install.html
  
 ### version: 
- - DPDK: dpdk-stable-18.11.1
- - Suricata: suricata-4.1.4
+| DPDK | dpdk-stable-18.11.1 |
+| Suricata | suricata-4.1.4 |
 
 ### Build and Run
 
