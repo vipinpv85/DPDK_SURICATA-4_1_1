@@ -19,7 +19,7 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 - Download DPDK from dpdk.org.
 - Untar DPDK tar file.
 - use `make config T=x86_64-native-linuxapp-gcc O=x86_64-native-linuxapp-gcc`.
-- Execute 
+- Execute the following commands
 ```
  export RTE_SDK=$PWD
  export RTE_TARGET=x86_64-native-linuxapp-gcc
