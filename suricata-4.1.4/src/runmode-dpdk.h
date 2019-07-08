@@ -47,6 +47,7 @@ typedef struct __attribute__((__packed__))
 	uint16_t mtu;
 	uint8_t rss_tuple:2;
 	uint8_t jumbo:1;
+	uint8_t lcore_index;
 } DpdkPortConfig_t;
 
 typedef struct __attribute__((__packed__))
@@ -70,5 +71,7 @@ int CreateDpdkAcl(void);
 int CreateDpdkReassemblyFragement(void);
 int ValidateDpdkConfig(void);
 int SetupDdpdkPorts(void);
+void DumpGlobalConfig(void);
+void ListDpdkConfig(void);
 
 #endif  /* __RUNMODE_DPDK_H__ */

@@ -1866,7 +1866,7 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
 #ifdef HAVE_DPDK
                 if (suri->run_mode == RUNMODE_UNKNOWN) {
                     suri->run_mode = RUNMODE_DPDK;
-                    SCLogInfo(" DPDK Mode selected\n");
+                    SCLogNotice(" DPDK Mode selected");
 
                     memset(suri->pcap_dev, 0, sizeof(suri->pcap_dev));
 
@@ -3125,6 +3125,8 @@ int main(int argc, char **argv)
 
         SCLogInfo(" init Connection Ring!\n");
         SCLogInfo(" kick start DPDK RX-TX threads\n");
+
+        DumpGlobalConfig();
     }
 #endif
 
@@ -3165,6 +3167,12 @@ int main(int argc, char **argv)
     PostRunDeinit(suricata.run_mode, &suricata.start_time);
     /* kill remaining threads */
     TmThreadKillThreads();
+
+#ifdef HAVE_DPDK
+    if (suricata.run_mode == RUNMODE_DPDK) {
+        KillDpdkSuricata;
+    }
+#endif
 
 out:
     GlobalsDestroy(&suricata);

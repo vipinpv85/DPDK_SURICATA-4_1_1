@@ -1821,7 +1821,7 @@ dpdk:
   post-acl: yes
   tx-fragment: no
   rx-reassemble: no
-  # IDS, IPS, HYBRID (new mode)
+  # BYPASS, IDS, IPS, HYBRID (new mode)
   mode: IDS
   # DPDK port index
   input-output-map: ["0-0", "1-1"]
