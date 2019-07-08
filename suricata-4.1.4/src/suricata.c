@@ -3113,6 +3113,21 @@ int main(int argc, char **argv)
         goto out;
     }
 
+#ifdef HAVE_DPDK
+    SCLogInfo(" Validate user !\n");
+    if (suricata.run_mode == RUNMODE_DPDK) {
+        SCLogDebug(" Validate user configuration!\n");
+        SCLogDebug(" Init ports per config!\n");
+        if (ValidateDpdkConfig() != 0) {
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to set config!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        SCLogInfo(" init Connection Ring!\n");
+        SCLogInfo(" kick start DPDK RX-TX threads\n");
+    }
+#endif
+
     SCSetStartTime(&suricata);
     RunModeDispatch(suricata.run_mode, suricata.runmode_custom_mode);
     if (suricata.run_mode != RUNMODE_UNIX_SOCKET) {

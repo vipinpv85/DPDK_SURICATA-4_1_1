@@ -30,7 +30,17 @@
 #ifndef __RUNMODE_DPDK_H__
 #define __RUNMODE_DPDK_H__
 
-typedef struct
+typedef struct __attribute__((__packed__))
+{
+	char name[50];
+	unsigned n;
+	unsigned elt_size;
+	int socket_id;
+	uint16_t private_data_size;
+	void *mbuf_ptr;
+} DpdkMempool_t;
+
+typedef struct __attribute__((__packed__))
 {
 	uint8_t rxq_count;
 	uint8_t txq_count;
@@ -39,7 +49,7 @@ typedef struct
 	uint8_t jumbo:1;
 } DpdkPortConfig_t;
 
-typedef struct
+typedef struct __attribute__((__packed__))
 {
 	uint16_t pre_acl:1;
 	uint16_t post_acl:1;
@@ -58,5 +68,7 @@ void *ParseDpdkConfig(const char *file);
 int ParseDpdkYaml(void);
 int CreateDpdkAcl(void);
 int CreateDpdkReassemblyFragement(void);
+int ValidateDpdkConfig(void);
+int SetupDdpdkPorts(void);
 
 #endif  /* __RUNMODE_DPDK_H__ */

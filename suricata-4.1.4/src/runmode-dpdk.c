@@ -47,6 +47,7 @@
 #ifdef HAVE_DPDK
 #define SUIRCATA_DPDK_MAXARGS 16
 
+DpdkMempool_t dpdk_mempool_config;
 DpdkConfig_t dpdk_config;
 DpdkPortConfig_t dpdk_ports[RTE_MAX_ETHPORTS];
 
@@ -81,6 +82,135 @@ void RunModeDpdkRegister(void)
 #endif
 
 	return;
+}
+
+int SetupDdpdkPorts(void)
+{
+	SCEnter();
+
+#ifndef HAVE_DPDK
+	SCLogInfo(" not configured for DPDK\n");
+#else
+	SCLogDebug(" port setup!\n");
+
+	uint16_t nb_rxd = 1024;
+	uint16_t nb_txd = 1024;
+	uint16_t mtu = 0;
+	int i;
+
+	struct rte_eth_conf port_conf = {
+		.rxmode = {
+			.mq_mode = ETH_MQ_RX_RSS,
+			.max_rx_pkt_len = ETHER_MAX_LEN,
+			.split_hdr_size = 0,
+		},
+		.rx_adv_conf = {
+			.rss_conf = {
+				.rss_key = NULL,
+				.rss_hf = ETH_RSS_IP,
+			},
+		},
+	};
+
+	/* create mbuf_pool if not created */
+	if (rte_mempool_lookup(dpdk_mempool_config.name) == NULL) {
+		dpdk_mempool_config.mbuf_ptr = rte_pktmbuf_pool_create(
+				dpdk_mempool_config.name, dpdk_mempool_config.n,
+				/* MEMPOOL_CACHE_SIZE*/ 256, dpdk_mempool_config.private_data_size,
+				RTE_MBUF_DEFAULT_BUF_SIZE, dpdk_mempool_config.socket_id);
+	}
+	if (dpdk_mempool_config.mbuf_ptr == NULL) {
+		SCLogError(SC_ERR_DPDK_CONFIG, "Failed to create mbuf pool!\n");
+		return -EINVAL;
+	}
+	SCLogDebug(" mbuf pool (%p)!\n", rte_mempool_lookup(dpdk_mempool_config.name));
+
+	RTE_ETH_FOREACH_DEV(i) {
+		SCLogDebug(" port index %d!\n", i);
+
+		struct rte_eth_dev_info dev_info;
+		struct rte_eth_conf local_port_conf = port_conf;
+		uint64_t rx_offloads = local_port_conf.rxmode.offloads;
+
+		if (dpdk_ports[i].jumbo) {
+			rx_offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+		}
+		local_port_conf.rxmode.offloads = rx_offloads;
+
+		rte_eth_dev_info_get(i, &dev_info);
+		if (rte_eth_dev_adjust_nb_rx_tx_desc(i, &nb_rxd, &nb_txd) < 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to adjust port (%d) descriptor for rx and tx!\n", i);
+			return -EINVAL;
+		}
+
+		if (dpdk_ports[i].rxq_count == 1) {
+			local_port_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
+		} else {
+
+			local_port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
+			if (local_port_conf.rx_adv_conf.rss_conf.rss_hf != port_conf.rx_adv_conf.rss_conf.rss_hf) {
+				SCLogInfo(" Port %u modified RSS hash function based on hardware support,"
+						"requested:%#"PRIx64" configured:%#"PRIx64"\n",
+						i,
+						port_conf.rx_adv_conf.rss_conf.rss_hf,
+						local_port_conf.rx_adv_conf.rss_conf.rss_hf);
+
+				if (local_port_conf.rx_adv_conf.rss_conf.rss_hf == 0)
+					return -EINVAL;
+			}
+		}
+
+		if (rte_eth_dev_configure(i, dpdk_ports[i].rxq_count, dpdk_ports[i].txq_count, &local_port_conf) < 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to configure port [%d]\n", i);
+			return -EINVAL;
+		}
+
+		if (rte_eth_rx_queue_setup(i, dpdk_ports[i].rxq_count, nb_rxd, rte_socket_id(), NULL, dpdk_mempool_config.mbuf_ptr) < 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] rx_queue: %d.\n", i, dpdk_ports[i].rxq_count);
+			return -EINVAL;
+		}
+
+		if (rte_eth_tx_queue_setup(i, dpdk_ports[i].txq_count, nb_txd, rte_socket_id(), NULL) < 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] tx_queue: %d.\n", i, dpdk_ports[i].txq_count);
+			return -EINVAL;
+		}
+
+		if (rte_eth_dev_get_mtu (i, &mtu) != 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to fetch mtu for port [%d]\n", i);
+			return -EINVAL;
+		}
+
+		if (mtu != dpdk_ports[i].mtu) {
+			if (rte_eth_dev_set_mtu (i, mtu) != 0) {
+				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to set mtu (%u) for port [%d]\n", mtu, i);
+				return -EINVAL;
+			}
+		}
+
+			rte_eth_promiscuous_enable(i);
+	}
+
+#endif
+
+	return 0;
+}
+
+int ValidateDpdkConfig(void)
+{
+	SCEnter();
+
+#ifndef HAVE_DPDK
+	SCLogInfo(" not configured for DPDK\n");
+#else
+	SCLogDebug(" ports %u\n!", GetDpdkPort());
+	/* port setup */
+	SetupDdpdkPorts();
+
+	/* if mode is IPS - check port map are different and same speed */
+	/* if mode is IDS - check port map are same */
+#endif
+
+	return 0;
 }
 
 int CreateDpdkReassemblyFragement(void)
@@ -241,6 +371,7 @@ void *ParseDpdkConfig(const char *dpdkCfg)
 		}
 	}
 
+	/* get section name PORT-X */
 	for (int i = 0; i < RTE_MAX_ETHPORTS; i++) {
 		char port_section_name[15] = {"PORT-"};
 
@@ -266,14 +397,39 @@ void *ParseDpdkConfig(const char *dpdkCfg)
 					else if (strcasecmp("rss-tuple", entries[j].name) == 0)
 						dpdk_ports[j].rss_tuple = atoi(entries[j].value);
 					else if (strcasecmp("jumbo", entries[j].name) == 0)
-						dpdk_ports[j].jumbo = atoi(entries[j].value);
+						dpdk_ports[j].jumbo = (strcasecmp(entries[j].value, "yes")) ? 1 : 0;
 				}
 			}
 		}
 	}
 
-	rte_cfgfile_close(file);
+	/* get section name MEMPOOL-PORT */
+	if (rte_cfgfile_has_section(file, "MEMPOOL-PORT")) {
+		SCLogDebug(" section (MEMPOOL-PORT); count %d\n", rte_cfgfile_num_sections(file, "MEMPOOL-PORT", sizeof("MEMPOOL-PORT") - 1));
+		SCLogDebug(" section (MEMPOOL-PORT) has entries %d\n", rte_cfgfile_section_num_entries(file, "MEMPOOL-PORT"));
 
+		int n_entries = rte_cfgfile_section_num_entries(file, "MEMPOOL-PORT");
+		struct rte_cfgfile_entry entries[n_entries];
+
+		if (rte_cfgfile_section_entries(file, "MEMPOOL-PORT", entries, n_entries) != -1) {
+			for (int j = 0; j < n_entries; j++) {
+				SCLogDebug(" - entries[i] name: (%s) value: (%s)\n", entries[j].name, entries[j].value);
+
+				if (strcasecmp("name", entries[j].name) == 0)
+					rte_memcpy(dpdk_mempool_config.name, entries[j].value, sizeof(entries[j].value));
+				if (strcasecmp("n", entries[j].name) == 0)
+					dpdk_mempool_config.n = atoi(entries[j].value);
+				if (strcasecmp("elt_size", entries[j].name) == 0)
+					dpdk_mempool_config.elt_size = atoi(entries[j].value);
+				if (strcasecmp("private_data_size", entries[j].name) == 0)
+					dpdk_mempool_config.private_data_size = atoi(entries[j].value);
+				if (strcasecmp("socket_id", entries[j].name) == 0)
+					dpdk_mempool_config.private_data_size = atoi(entries[j].value);
+			}
+		}
+	}
+
+	rte_cfgfile_close(file);
 	return file;
 #else
 	SCLogInfo(" not configured for ParseDpdkConfig\n");
