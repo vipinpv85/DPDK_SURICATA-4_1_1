@@ -74,5 +74,6 @@ int SetupDdpdkPorts(void);
 void DumpGlobalConfig(void);
 void ListDpdkConfig(void);
 int CreateDpdkRing(void);
+uint8_t GetRunMode(void);
 
 #endif  /* __RUNMODE_DPDK_H__ */

@@ -585,6 +585,16 @@ int RunModeDpdkWorkers(void)
 #endif
 }
 
+uint8_t GetRunMode(void)
+{
+	SCEnter();
+#ifdef HAVE_DPDK
+	return dpdk_config.mode;
+#else
+	return 0; /*BYPASS*/
+#endif
+}
+
 uint16_t GetDpdkPort(void)
 {
 	SCEnter();

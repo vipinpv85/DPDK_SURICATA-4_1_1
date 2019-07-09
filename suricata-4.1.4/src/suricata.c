@@ -3129,10 +3129,13 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        SCLogInfo(" kick start DPDK RX-TX threads\n");
+        SCLogDebug(" set run mode as IDS|IPS run mode %u is ips %u is ids %u ", GetRunMode(), EngineModeIsIPS(), EngineModeIsIDS());
+        if (GetRunMode() == 1)
+            EngineModeSetIDS();
+        else if (GetRunMode() == 2)
+            EngineModeSetIPS();
 
-        SCLogInfo(" set run mode as IDS|IPS");
-        //EngineModeSetIPS() : EngineModeSetIDS;
+        SCLogInfo(" kick start DPDK RX-TX threads\n");
 
         DumpGlobalConfig();
     }
