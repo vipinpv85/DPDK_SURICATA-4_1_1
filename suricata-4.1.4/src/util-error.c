@@ -360,6 +360,7 @@ const char * SCErrorToString(SCError err)
         CASE_CODE (SC_WARN_DEFAULT_WILL_CHANGE);
         CASE_CODE (SC_WARN_EVE_MISSING_EVENTS);
         CASE_CODE (SC_ERR_DPDK_CONFIG);
+        CASE_CODE (SC_ERR_DPDK_MEM);
 
         CASE_CODE (SC_ERR_MAX);
     }

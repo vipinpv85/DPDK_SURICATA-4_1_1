@@ -85,6 +85,39 @@ void RunModeDpdkRegister(void)
 	return;
 }
 
+int CreateDpdkRing(void)
+{
+	SCEnter();
+
+#ifndef HAVE_DPDK
+	SCLogInfo(" not configured for DPDK");
+	return -1;
+#else
+	int max_rings = GetDpdkPort();
+	char ring_name[15] = {"SCRING"};
+
+	for (int i = 0; i < max_rings; i++)
+	{
+		sprintf(ring_name, "%s%d", ring_name, i);
+		SCLogNotice(" ring create for %s", ring_name);
+
+		if (rte_ring_lookup(ring_name) == NULL) {
+			struct rte_ring *ptr = rte_ring_create(ring_name, 8192/*size*/, rte_socket_id(), RING_F_SP_ENQ|RING_F_SC_DEQ);
+			if (ptr == NULL) {
+				SCLogError(SC_ERR_DPDK_MEM, " failed to create (%s) RING!", ring_name);
+				return -1;
+			}
+		}
+	}
+
+
+	SCLogDebug(" RING setup!");
+
+
+	return 0;
+#endif
+}
+
 int SetupDdpdkPorts(void)
 {
 	SCEnter();
@@ -144,6 +177,11 @@ int SetupDdpdkPorts(void)
 			return -EINVAL;
 		}
 
+	nb_rxd = 1024;
+	nb_txd = 1024;
+	dpdk_ports[i].rxq_count = (dpdk_ports[i].rxq_count == 0) ? 1 : dpdk_ports[i].rxq_count;
+	dpdk_ports[i].txq_count = (dpdk_ports[i].txq_count == 0) ? 1 : dpdk_ports[i].txq_count;
+
 		if (dpdk_ports[i].rxq_count == 1) {
 			local_port_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
 		} else {
@@ -174,7 +212,7 @@ int SetupDdpdkPorts(void)
 		}
 
 		for (j = 0; j < dpdk_ports[i].txq_count; j++) {
-			if (rte_eth_tx_queue_setup(i, j, nb_txd, rte_socket_id(), NULL) < 0) {
+			if (rte_eth_tx_queue_setup(i, j, nb_txd, rte_eth_dev_socket_id(i), NULL) < 0) {
 				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] tx_queue: %d.\n", i, dpdk_ports[i].txq_count);
 				return -EINVAL;
 			}

@@ -3123,8 +3123,16 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        SCLogInfo(" init Connection Ring!\n");
+        SCLogDebug(" init Connection Ring!\n");
+        if (CreateDpdkRing() != 0) {
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create Ring!\n");
+            exit(EXIT_FAILURE);
+        }
+
         SCLogInfo(" kick start DPDK RX-TX threads\n");
+
+        SCLogInfo(" set run mode as IDS|IPS");
+        //EngineModeSetIPS() : EngineModeSetIDS;
 
         DumpGlobalConfig();
     }
