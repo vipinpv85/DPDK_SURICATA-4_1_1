@@ -382,6 +382,7 @@ source-pcap-file-directory-helper.c source-pcap-file-directory-helper.h \
 source-pcap-file-helper.c source-pcap-file-helper.h \
 source-pfring.c source-pfring.h \
 source-windivert.c source-windivert.h \
+source-dpdk.c source-dpdk.h \
 stream.c stream.h \
 stream-tcp.c stream-tcp.h stream-tcp-private.h \
 stream-tcp-inline.c stream-tcp-inline.h \
@@ -524,7 +525,7 @@ EXTRA_DIST = tests
 AM_CPPFLAGS = $(all_includes)
 
 # the library search path.
-suricata_LDFLAGS = $(all_libraries) ${SECLDFLAGS}
+suricata_LDFLAGS = $(all_libraries) ${SECLDFLAGS} ${DPDK_LDFLAGS}
 suricata_LDADD = $(HTP_LDADD) $(RUST_LDADD)
 
 if HAVE_RUST
