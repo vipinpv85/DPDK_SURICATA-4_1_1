@@ -43,6 +43,7 @@
 #include "util-cpu.h"
 #include "util-affinity.h"
 #include "util-device.h"
+#include "util-runmodes.h"
 
 #ifdef HAVE_DPDK
 #define SUIRCATA_DPDK_MAXARGS 16
@@ -52,7 +53,7 @@ static DpdkConfig_t dpdk_config;
 static DpdkPortConfig_t dpdk_ports[RTE_MAX_ETHPORTS];
 
 /* Number of configured parallel pipelines. */
-int dpdk_num_pipelines;
+static int dpdk_num_pipelines;
 
 static uint16_t inout_map_count = 0;
 uint16_t argument_count = 1;
@@ -93,13 +94,13 @@ int CreateDpdkRing(void)
 	SCLogInfo(" not configured for DPDK");
 	return -1;
 #else
-	int max_rings = GetDpdkPort();
-	char ring_name[15] = {"SCRING"};
+	int i, ring_index = 0;
+	char ring_name[25] = {""};
 
-	for (int i = 0; i < max_rings; i++)
+	for (i = 0; i < dpdk_num_pipelines; i++)
 	{
-		sprintf(ring_name, "%s%d", ring_name, i);
-		SCLogNotice(" ring create for %s", ring_name);
+		sprintf(ring_name, "SCRING%d", i);
+		SCLogDebug(" ring create for %s", ring_name);
 
 		if (rte_ring_lookup(ring_name) == NULL) {
 			struct rte_ring *ptr = rte_ring_create(ring_name, 8192/*size*/, rte_socket_id(), RING_F_SP_ENQ|RING_F_SC_DEQ);
@@ -109,10 +110,24 @@ int CreateDpdkRing(void)
 			}
 		}
 	}
+	SCLogDebug(" RING setup done");
 
+	SCLogDebug(" Map port to ring");
 
-	SCLogDebug(" RING setup!");
+	RTE_ETH_FOREACH_DEV(i)
+	{
+		struct rte_eth_dev_info dev_info;
 
+		rte_eth_dev_info_get(i, &dev_info);
+
+		for (int j = 0; j < dev_info.nb_rx_queues; j++) 
+		{
+			sprintf(ring_name, "SCRING%d", ring_index++);
+			dpdk_config.port_ring[i][j] = rte_ring_lookup(ring_name);
+
+			SCLogDebug(" dpdk_config.port_ring for port %u queue %u is %p", i, j, dpdk_config.port_ring[i][j]);
+		}
+	}
 
 	return 0;
 #endif
@@ -173,7 +188,7 @@ int SetupDdpdkPorts(void)
 
 		rte_eth_dev_info_get(i, &dev_info);
 		if (rte_eth_dev_adjust_nb_rx_tx_desc(i, &nb_rxd, &nb_txd) < 0) {
-			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to adjust port (%d) descriptor for rx and tx!\n", i);
+			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to adjust port (%d) descriptor for rx and tx!", i);
 			return -EINVAL;
 		}
 
@@ -189,7 +204,7 @@ int SetupDdpdkPorts(void)
 			local_port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
 			if (local_port_conf.rx_adv_conf.rss_conf.rss_hf != port_conf.rx_adv_conf.rss_conf.rss_hf) {
 				SCLogInfo(" Port %u modified RSS hash function based on hardware support,"
-						"requested:%#"PRIx64" configured:%#"PRIx64"\n",
+						"requested:%#"PRIx64" configured:%#"PRIx64,
 						i,
 						port_conf.rx_adv_conf.rss_conf.rss_hf,
 						local_port_conf.rx_adv_conf.rss_conf.rss_hf);
@@ -200,32 +215,33 @@ int SetupDdpdkPorts(void)
 		}
 
 		if (rte_eth_dev_configure(i, dpdk_ports[i].rxq_count, dpdk_ports[i].txq_count, &local_port_conf) < 0) {
-			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to configure port [%d]\n", i);
+			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to configure port [%d]", i);
 			return -EINVAL;
 		}
 
 		for (j = 0; j < dpdk_ports[i].rxq_count; j++) {
 			if (rte_eth_rx_queue_setup(i, j, nb_rxd, rte_eth_dev_socket_id(i), NULL, dpdk_mempool_config.mbuf_ptr) < 0) {
-				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] rx_queue: %d.\n", i, dpdk_ports[i].rxq_count);
+				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] rx_queue: %d.", i, dpdk_ports[i].rxq_count);
 				return -EINVAL;
 			}
+			dpdk_num_pipelines += 1;
 		}
 
 		for (j = 0; j < dpdk_ports[i].txq_count; j++) {
 			if (rte_eth_tx_queue_setup(i, j, nb_txd, rte_eth_dev_socket_id(i), NULL) < 0) {
-				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] tx_queue: %d.\n", i, dpdk_ports[i].txq_count);
+				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] tx_queue: %d.", i, dpdk_ports[i].txq_count);
 				return -EINVAL;
 			}
 		}
 
 		if (rte_eth_dev_get_mtu (i, &mtu) != 0) {
-			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to fetch mtu for port [%d]\n", i);
+			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to fetch mtu for port [%d]", i);
 			return -EINVAL;
 		}
 
 		if (mtu != dpdk_ports[i].mtu) {
 			if (rte_eth_dev_set_mtu (i, mtu) != 0) {
-				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to set mtu (%u) for port [%d]\n", mtu, i);
+				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to set mtu (%u) for port [%d]", mtu, i);
 				return -EINVAL;
 			}
 		}
@@ -234,7 +250,7 @@ int SetupDdpdkPorts(void)
 
 		/* check lcore_index for the given port is valid */
 		if (dpdk_ports[i].lcore_index >= rte_lcore_count()) {
-			SCLogError(SC_ERR_DPDK_CONFIG, " Mismatch for lcore_index (%u) for port [%d]\n",
+			SCLogError(SC_ERR_DPDK_CONFIG, " Mismatch for lcore_index (%u) for port [%d]",
 					dpdk_ports[i].lcore_index, i);
 			return -EINVAL;
 		}
@@ -250,7 +266,7 @@ int ValidateDpdkConfig(void)
 	SCEnter();
 
 #ifndef HAVE_DPDK
-	SCLogInfo(" not configured for DPDK\n");
+	SCLogInfo(" not configured for DPDK");
 #else
 	SCLogDebug(" ports %u\n!", GetDpdkPort());
 
@@ -275,7 +291,7 @@ int ValidateDpdkConfig(void)
 				for (int j = 0; j < inout_map_count; j++)
 				{
 					if (dpdk_config.portmap[j][0] == dpdk_config.portmap[j][1]) {
-						SCLogError(SC_ERR_DPDK_CONFIG, " Mode (%u); port in (%u) out (%u) is same\n",
+						SCLogError(SC_ERR_DPDK_CONFIG, " Mode (%u); port in (%u) out (%u) is same",
 							dpdk_config.mode, dpdk_config.portmap[j][0], dpdk_config.portmap[j][1]);
 						return -1;
 					}
@@ -328,7 +344,7 @@ int ValidateDpdkConfig(void)
 				}
 		}
 	} else {
-		SCLogError(SC_ERR_DPDK_CONFIG, " no ports\n");
+		SCLogError(SC_ERR_DPDK_CONFIG, " no ports");
 		return -1;
 	}
 #endif
@@ -342,17 +358,17 @@ int CreateDpdkReassemblyFragement(void)
 	SCEnter();
 
 #ifndef HAVE_DPDK
-	SCLogInfo(" not configured for DPDK\n");
+	SCLogInfo(" not configured for DPDK");
 #else
 	if (dpdk_config.rx_reassemble)
-		SCLogDebug(" Reassembly enable!\n");
+		SCLogDebug(" Reassembly enable!");
 	else
-		SCLogDebug(" Reassembly disable!\n");
+		SCLogDebug(" Reassembly disable!");
 
 	if (dpdk_config.tx_fragment)
-		SCLogDebug(" Fragement enable!\n");
+		SCLogDebug(" Fragement enable!");
 	else
-		SCLogDebug(" Fragement disable!\n");
+		SCLogDebug(" Fragement disable!");
 #endif
 
 	return ret;
@@ -365,17 +381,17 @@ int CreateDpdkAcl(void)
 	SCEnter();
 
 #ifndef HAVE_DPDK
-	SCLogInfo(" not configured for DPDK\n");
+	SCLogInfo(" not configured for DPDK");
 #else
 	if (dpdk_config.pre_acl)
-		SCLogDebug(" PRE-ACL to create!\n");
+		SCLogDebug(" PRE-ACL to create!");
 	else
-		SCLogDebug(" PRE-ACL need not to create!\n");
+		SCLogDebug(" PRE-ACL need not to create!");
 
 	if (dpdk_config.post_acl)
-		SCLogDebug(" POST-ACL to create!\n");
+		SCLogDebug(" POST-ACL to create!");
 	else
-		SCLogDebug(" POST-ACL need not to create!\n");
+		SCLogDebug(" POST-ACL need not to create!");
 #endif
 
 	return ret;
@@ -388,16 +404,16 @@ int ParseDpdkYaml(void)
 	SCEnter();
 
 #ifndef HAVE_DPDK
-	SCLogInfo(" not configured for DPDK\n");
+	SCLogInfo(" not configured for DPDK");
 #else
-	SCLogDebug(" configured for Dpdk\n");
+	SCLogDebug(" configured for Dpdk");
 
 	const char dpdk_components[10][40] = {
 			"pre-acl", "post-acl",
 			"rx-reassemble", "tx-fragment",
 			"mode", "input-output-map"
 			};
-	SCLogDebug(" elements in yaml for dpdk: %d\n", (int) RTE_DIM(dpdk_components));
+	SCLogDebug(" elements in yaml for dpdk: %d", (int) RTE_DIM(dpdk_components));
 
 	ConfNode *node = ConfGetNode("dpdk");
 	if (node == NULL) {
@@ -408,11 +424,11 @@ int ParseDpdkYaml(void)
 	ConfNode *sub_node = NULL;
 
 	TAILQ_FOREACH(sub_node, &node->head, next) {
-		SCLogDebug(" sub_node (%s) node (%s)\n", sub_node->name, node->name);
+		SCLogDebug(" sub_node (%s) node (%s)", sub_node->name, node->name);
 
 		for (unsigned long int i = 0; i < RTE_DIM(dpdk_components); i++) {
 			if (strcasecmp(dpdk_components[i], sub_node->name) == 0) {
-				SCLogDebug(" sub_node (%s) val (%s)\n", sub_node->name, sub_node->val);
+				SCLogDebug(" sub_node (%s) val (%s)", sub_node->name, sub_node->val);
 
 				if (strcasecmp("pre-acl", sub_node->name) == 0) {
 					dpdk_config.pre_acl = (strcasecmp("yes", sub_node->val) ? 1 : 0);
@@ -437,13 +453,13 @@ int ParseDpdkYaml(void)
 					ConfNode *sub_node_val = NULL;
 					char *val_fld[2];
 
-						SCLogDebug(" sub_node (%s) \n", sub_node->name);
+						SCLogDebug(" sub_node (%s) ", sub_node->name);
 					if (strcasecmp("input-output-map", sub_node->name) == 0) {
 
 						TAILQ_FOREACH(sub_node_val, &sub_node->head, next) {
-							SCLogDebug(" sub_node (%s) val (%s)\n", sub_node->name, sub_node_val->val);
+							SCLogDebug(" sub_node (%s) val (%s)", sub_node->name, sub_node_val->val);
 							if (rte_strsplit(sub_node_val->val, sizeof(sub_node_val->val), val_fld, 2, '-') == 2) {
-								SCLogDebug(" portmap: in %s out %s\n", val_fld[0], val_fld[1]);
+								SCLogDebug(" portmap: in %s out %s", val_fld[0], val_fld[1]);
 
 								dpdk_config.portmap[inout_map_count][0] = atoi(val_fld[0]);
 								dpdk_config.portmap[inout_map_count][1] = atoi(val_fld[1]);
@@ -458,62 +474,63 @@ int ParseDpdkYaml(void)
 		}
 	}
 
-	SCLogDebug(" dpdk_config: \n - pre_acl (%u)\n - post_acl (%u)\n - rx_reassemble (%d)\n - tx_fragment (%u)\n - mode (%u)\n",
+	SCLogDebug(" dpdk_config: \n - pre_acl (%u)\n - post_acl (%u)\n - rx_reassemble (%d)\n - tx_fragment (%u)\n - mode (%u)",
 			dpdk_config.pre_acl, dpdk_config.post_acl,
 			dpdk_config.rx_reassemble, dpdk_config.tx_fragment,
 			dpdk_config.mode);
 	for (int j = 0; j < inout_map_count; j++) {
-		SCLogDebug(" - port-map (%d), in (%d) out (%d)\n", j, dpdk_config.portmap[j][0], dpdk_config.portmap[j][1]);
+		SCLogDebug(" - port-map (%d), in (%d) out (%d)", j, dpdk_config.portmap[j][0], dpdk_config.portmap[j][1]);
 	}
-
 #endif
-	return ret;
+
+	SCReturnInt(ret);
 }
 
 void *ParseDpdkConfig(const char *dpdkCfg)
 {
 	SCEnter();
-#ifdef HAVE_DPDK
 	struct rte_cfgfile *file = NULL;
+
+#ifdef HAVE_DPDK
 	file = rte_cfgfile_load(dpdkCfg, 0);
 
 	/* get section name EAL */
 	if (rte_cfgfile_has_section(file, "EAL")) {
-		SCLogDebug(" section (EAL); count %d\n", rte_cfgfile_num_sections(file, "EAL", sizeof("EAL") - 1));
-		SCLogDebug(" section (EAL) has entries %d\n", rte_cfgfile_section_num_entries(file, "EAL"));
+		SCLogDebug(" section (EAL); count %d", rte_cfgfile_num_sections(file, "EAL", sizeof("EAL") - 1));
+		SCLogDebug(" section (EAL) has entries %d", rte_cfgfile_section_num_entries(file, "EAL"));
 
 		int n_entries = rte_cfgfile_section_num_entries(file, "EAL");
 		struct rte_cfgfile_entry entries[n_entries];
 
 		if (rte_cfgfile_section_entries(file, "EAL", entries, n_entries) != -1) {
 			argument_count += n_entries * 2;
-			SCLogDebug(" argument_count %d\n", argument_count);
+			SCLogDebug(" argument_count %d", argument_count);
 
 			for (int i = 0; i < n_entries; i++) {
-				SCLogDebug(" - entries[i].name: (%s) entries[i].value: (%s)\n", entries[i].name, entries[i].value);
+				SCLogDebug(" - entries[i].name: (%s) entries[i].value: (%s)", entries[i].name, entries[i].value);
 				snprintf(argument[i * 2 + 1], 32, "%s", entries[i].name);
 				snprintf(argument[i * 2 + 2], 32, "%s", entries[i].value);
-				SCLogDebug(" - argument: (%s) (%s)\n", argument[i * 2 + 1], argument[i * 2 + 2]);
+				SCLogDebug(" - argument: (%s) (%s)", argument[i * 2 + 1], argument[i * 2 + 2]);
 			}
 		}
 	}
 
 	/* get section name PORT-X */
 	for (int i = 0; i < RTE_MAX_ETHPORTS; i++) {
-		char port_section_name[15] = {"PORT-"};
+		char port_section_name[15] = {""};
 
-		sprintf(port_section_name, "%s%d", port_section_name, i);
+		sprintf(port_section_name, "%s%d", "PORT-", i);
 		if (rte_cfgfile_has_section(file, port_section_name)) {
 			int n_port_entries = rte_cfgfile_section_num_entries(file, port_section_name);
 
-			SCLogDebug(" %s\n", port_section_name);
-			SCLogDebug(" section (PORT) has %d entries\n", n_port_entries);
+			SCLogDebug(" %s", port_section_name);
+			SCLogDebug(" section (PORT) has %d entries", n_port_entries);
 
 			struct rte_cfgfile_entry entries[n_port_entries];
 			if (rte_cfgfile_section_entries(file, port_section_name, entries, n_port_entries) != -1) {
 
 				for (int j = 0; j < n_port_entries; j++) {
-					SCLogDebug(" %s name: (%s) value: (%s)\n", port_section_name, entries[j].name, entries[j].value);
+					SCLogDebug(" %s name: (%s) value: (%s)", port_section_name, entries[j].name, entries[j].value);
 
 					if (strcasecmp("rx-queues", entries[j].name) == 0)
 						dpdk_ports[i].rxq_count = atoi(entries[j].value);
@@ -534,15 +551,15 @@ void *ParseDpdkConfig(const char *dpdkCfg)
 
 	/* get section name MEMPOOL-PORT */
 	if (rte_cfgfile_has_section(file, "MEMPOOL-PORT")) {
-		SCLogDebug(" section (MEMPOOL-PORT); count %d\n", rte_cfgfile_num_sections(file, "MEMPOOL-PORT", sizeof("MEMPOOL-PORT") - 1));
-		SCLogDebug(" section (MEMPOOL-PORT) has entries %d\n", rte_cfgfile_section_num_entries(file, "MEMPOOL-PORT"));
+		SCLogDebug(" section (MEMPOOL-PORT); count %d", rte_cfgfile_num_sections(file, "MEMPOOL-PORT", sizeof("MEMPOOL-PORT") - 1));
+		SCLogDebug(" section (MEMPOOL-PORT) has entries %d", rte_cfgfile_section_num_entries(file, "MEMPOOL-PORT"));
 
 		int n_entries = rte_cfgfile_section_num_entries(file, "MEMPOOL-PORT");
 		struct rte_cfgfile_entry entries[n_entries];
 
 		if (rte_cfgfile_section_entries(file, "MEMPOOL-PORT", entries, n_entries) != -1) {
 			for (int j = 0; j < n_entries; j++) {
-				SCLogDebug(" - entries[i] name: (%s) value: (%s)\n", entries[j].name, entries[j].value);
+				SCLogDebug(" - entries[i] name: (%s) value: (%s)", entries[j].name, entries[j].value);
 
 				if (strcasecmp("name", entries[j].name) == 0)
 					rte_memcpy(dpdk_mempool_config.name, entries[j].value, sizeof(entries[j].value));
@@ -559,30 +576,139 @@ void *ParseDpdkConfig(const char *dpdkCfg)
 	}
 
 	rte_cfgfile_close(file);
-	return file;
 #else
-	SCLogInfo(" not configured for ParseDpdkConfig\n");
-	return NULL;
+	SCLogInfo(" not configured for ParseDpdkConfig");
 #endif
 
+	SCReturnPtr(file, "void *");
 }
 
-/**
- * \brief RunModeTileMpipeWorkers set up to process all modules in each thread.
- *
- * \param iface pointer to the name of the interface from which we will
- *              fetch the packets
- * \retval 0 if all goes well. (If any problem is detected the engine will
- *           exit())
- */
+static int DpdkGetThreadsCount(void *conf __attribute__((unused)))
+{
+	SCEnter();
+	int ret = 0;
+
+#ifdef HAVE_DPDK
+	ret = rte_lcore_count();
+#endif
+	SCLogInfo("\n ERROR: DPDK not supported!");
+
+	SCReturnInt(ret);
+}
+
+static void *DpdkConfigParser(const char *device)
+{
+	SCEnter();
+
+#ifdef HAVE_DPDK
+	SCLogNotice(" device (%s)", device);
+#endif
+
+	SCLogInfo("\n ERROR: DPDK not supported!");
+	SCReturnPtr(NULL, "void *");
+}
+
 int RunModeDpdkWorkers(void)
 {
+	SCEnter();
+	int ret = -1;
+
 #ifndef HAVE_DPDK
-	return 0;
+	SCLogInfo("\n ERROR: DPDK not supported!");
 #else
-	int nb_workers = 0;
-	return nb_workers;
+	char tname[50] = {""};
+	ThreadVars *tv_worker = NULL;
+	TmModule *tm_module = NULL;
+
+	RunModeInitialize();
+	TimeModeSetLive();
+
+	/* dump dpdk application configuration */
+	DumpGlobalConfig();
+
+	for (int i = 0; i < DpdkGetRxThreads(); i++) {
+		snprintf(tname, sizeof(tname), "%s%d", "DPDKRX-THREAD-", i);
+
+		tv_worker = TmThreadCreatePacketHandler(tname,
+				"packetpool", "packetpool",
+				"packetpool", "packetpool",
+				"pktacqloop");
+		if (tv_worker == NULL) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " TmThreadsCreate failed for (%s)", tname);
+			exit(EXIT_FAILURE);
+		}
+
+		/*
+		 * check if we need to do special processing
+		 * 1) HW offload flags
+		 * 2) drop unknown & error packets
+		 * 3) if frames fragement and re-assembly is set, sent for reassembly thread
+		 * else
+		 * 4) can we skip this thread as we can use rte_eal_remote_launch
+		 */
+
+		tm_module = TmModuleGetByName("ReceiveDPDK");
+		if (tm_module == NULL) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " TmModuleGetByName failed for ReceiveDPDK");
+			exit(EXIT_FAILURE);
+		}
+		TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
+
+		/*
+		 * If pre=acl is configured, use decode thread to process the frames.
+		 */
+
+		tm_module = TmModuleGetByName("DecodeDPDK");
+		if (tm_module == NULL) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " TmModuleGetByName failed for DecodeDPDK");
+			exit(EXIT_FAILURE);
+		}
+		TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
+
+        tm_module = TmModuleGetByName("FlowWorker");
+        if (tm_module == NULL) {
+            SCLogError(SC_ERR_RUNMODE, "TmModuleGetByName for FlowWorker failed");
+            exit(EXIT_FAILURE);
+        }
+        TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
+
+        tm_module = TmModuleGetByName("RespondReject");
+        if (tm_module == NULL) {
+            printf("ERROR: TmModuleGetByName for RespondReject failed\n");
+            exit(EXIT_FAILURE);
+        }
+        TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
+
+	if (TmThreadSpawn(tv_worker) != TM_ECODE_OK) {
+		printf("ERROR: TmThreadSpawn failed\n");
+		exit(EXIT_FAILURE);
+	}
+
+
+	}
+
+
+#if 0
+	/* default run mode is worker */
+	ret = RunModeSetLiveCaptureWorkers(
+			DpdkConfigParser, DpdkGetThreadsCount,
+			(const char *) "ReceiveDpdk",
+			(const char *) "DecodeDpdk",
+			(const char *)"DecodeDpdk", NULL);
+
+	if (ret != 0) {
+		SCLogError(SC_ERR_RUNMODE, "DPDK workers runmode failed to start");
+		exit(EXIT_FAILURE);
+	}
 #endif
+
+
+#if 0
+#endif
+
+	SCLogInfo("RunMode DPDK workers initialised");
+#endif
+	SCReturnInt(ret);
 }
 
 uint8_t GetRunMode(void)
@@ -595,14 +721,39 @@ uint8_t GetRunMode(void)
 #endif
 }
 
+int DpdkGetRxThreads(void)
+{
+	SCEnter();
+	int ret = 0;
+
+#ifdef HAVE_DPDK
+	int i = 0, current_lcore = -1;
+	RTE_ETH_FOREACH_DEV(i)
+	{
+		if (current_lcore != dpdk_ports[i].lcore_index) {
+			ret += 1;
+			current_lcore = dpdk_ports[i].lcore_index;
+		}
+	}
+#else
+	SCLogInfo("\n ERROR: DPDK not supported!");
+#endif
+
+	SCReturnInt(ret);
+}
+
 uint16_t GetDpdkPort(void)
 {
 	SCEnter();
+	int ret = 0;
+
 #ifdef HAVE_DPDK
-	return rte_eth_dev_count_avail();
+	ret = rte_eth_dev_count_avail();
 #else
-	return 0;
+	SCLogInfo("\n ERROR: DPDK not supported!");
 #endif
+
+	SCReturnInt(ret);
 }
 
 void ListDpdkConfig(void)
@@ -640,6 +791,7 @@ void ListDpdkConfig(void)
 	SCLogNotice(" - rx_reassemble (%u)", dpdk_config.rx_reassemble);
 	SCLogNotice(" - tx_fragment (%u)", dpdk_config.tx_fragment);
 	SCLogNotice(" - mode (%u)", dpdk_config.mode);
+	SCLogNotice(" - Ring Created (%u)", dpdk_num_pipelines);
 	SCLogNotice(" ");
 
 #endif

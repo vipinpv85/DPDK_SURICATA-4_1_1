@@ -86,11 +86,13 @@ typedef struct DpdkIntelIfaceConfig
     SC_ATOMIC_DECLARE(unsigned int, ref);
 } DpdkIntelIfaceConfig_t;
 
+#endif
 
 
-void TmModuleReceiveDpdkRegister (void);
-void TmModuleDecodeDpdkRegister (void);
+void TmModuleReceiveDpdkRegister(void);
+void TmModuleDecodeDpdkRegister(void);
 
+#if 0
 int PfringConfGetThreads(void);
 void PfringLoadConfig(void);
 

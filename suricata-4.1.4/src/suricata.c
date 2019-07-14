@@ -908,6 +908,9 @@ void RegisterAllModules(void)
     TmModuleDecodeMpipeRegister();
 #endif
 #ifdef HAVE_DPDK
+    /* DPDK */
+    TmModuleReceiveDpdkRegister();
+    TmModuleDecodeDpdkRegister();
 #endif
     /* af-packet */
     TmModuleReceiveAFPRegister();
@@ -985,12 +988,12 @@ static TmEcode ParseInterfacesList(const int runmode, char *pcap_dev)
         if (InitDpdkSuricata(argument_count, (char **)args)) {
             /* Identify the ports with DPDK */
             if (GetDpdkPort() == 0) {
-                SCLogError(SC_ERR_DPDK_CONFIG, " No DPDK ports found\n");
+                SCLogError(SC_ERR_DPDK_CONFIG, " No DPDK ports found");
                 SCReturnInt(TM_ECODE_FAILED);
             } else
-                SCLogInfo(" Found DPDK ports\n");
+                SCLogInfo(" Found DPDK ports");
         } else {
-            SCLogError(SC_ERR_DPDK_CONFIG, " failed to initialize DPDK\n");
+            SCLogError(SC_ERR_DPDK_CONFIG, " failed to initialize DPDK");
             SCReturnInt(TM_ECODE_FAILED);
         }
 #endif
@@ -1874,7 +1877,7 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
                     void *cfg_ptr = ParseDpdkConfig(optarg);
                     if (cfg_ptr == NULL) {
                         SCLogError(SC_ERR_DPDK_CONFIG,
-                               " File (%s) has config issue!\n", optarg);
+                               " File (%s) has config issue!", optarg);
                         exit(EXIT_FAILURE);
                     }
                 } else {
@@ -2479,7 +2482,7 @@ static int StartInternalRunMode(SCInstance *suri, int argc, char **argv)
             if (InitDpdkSuricata(1, args) >= 0)
                 ListDpdkPorts();
             else
-                SCLogError(SC_ERR_DPDK_CONFIG, " DPDK init failed\n");
+                SCLogError(SC_ERR_DPDK_CONFIG, " DPDK init failed");
             return TM_ECODE_DONE;
 #endif
         default:
@@ -3067,21 +3070,21 @@ int main(int argc, char **argv)
 
 #ifdef HAVE_DPDK
     if (suricata.run_mode == RUNMODE_DPDK) {
-        SCLogDebug(" Read DPDK contents YAML file.\n");
+        SCLogDebug(" Read DPDK contents YAML file.");
         if (ParseDpdkYaml()) {
-            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to read content DPDK!\n");
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to read content DPDK!");
             exit(EXIT_FAILURE);
         }
 
-        SCLogDebug(" Check for ACL offlaod for DPDK RX-TX.\n");
+        SCLogDebug(" Check for ACL offlaod for DPDK RX-TX.");
         if (CreateDpdkAcl()) {
-            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ACL DPDK!\n");
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ACL DPDK!");
             exit(EXIT_FAILURE);
         }
 
-        SCLogDebug(" Check for reassembly-fragemnt offlaod for DPDK.\n");
+        SCLogDebug(" Check for reassembly-fragemnt offlaod for DPDK.");
         if (CreateDpdkReassemblyFragement()) {
-            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ReassemblyFragement DPDK!\n");
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ReassemblyFragement DPDK!");
             exit(EXIT_FAILURE);
         }
     }
@@ -3114,18 +3117,17 @@ int main(int argc, char **argv)
     }
 
 #ifdef HAVE_DPDK
-    SCLogInfo(" Validate user !\n");
     if (suricata.run_mode == RUNMODE_DPDK) {
-        SCLogDebug(" Validate user configuration!\n");
-        SCLogDebug(" Init ports per config!\n");
+        SCLogDebug(" Validate user configuration!");
+        SCLogDebug(" Init ports per config!");
         if (ValidateDpdkConfig() != 0) {
-            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to set config!\n");
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to set config!");
             exit(EXIT_FAILURE);
         }
 
         SCLogDebug(" init Connection Ring!\n");
         if (CreateDpdkRing() != 0) {
-            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create Ring!\n");
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create Ring!");
             exit(EXIT_FAILURE);
         }
 
@@ -3135,9 +3137,7 @@ int main(int argc, char **argv)
         else if (GetRunMode() == 2)
             EngineModeSetIPS();
 
-        SCLogInfo(" kick start DPDK RX-TX threads\n");
-
-        DumpGlobalConfig();
+        SCLogInfo(" kick start DPDK RX-TX threads");
     }
 #endif
 

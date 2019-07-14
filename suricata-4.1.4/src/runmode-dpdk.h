@@ -58,6 +58,7 @@ typedef struct __attribute__((__packed__))
 	uint16_t rx_reassemble:1;
 	uint16_t mode:2;
 	uint16_t portmap[RTE_MAX_ETHPORTS][2];
+	void *port_ring[RTE_MAX_ETHPORTS][RTE_MAX_QUEUES_PER_PORT];
 } DpdkConfig_t;
 
 const char *RunModeDpdkGetDefaultMode(void);
@@ -75,5 +76,6 @@ void DumpGlobalConfig(void);
 void ListDpdkConfig(void);
 int CreateDpdkRing(void);
 uint8_t GetRunMode(void);
+int DpdkGetRxThreads(void);
 
 #endif  /* __RUNMODE_DPDK_H__ */
