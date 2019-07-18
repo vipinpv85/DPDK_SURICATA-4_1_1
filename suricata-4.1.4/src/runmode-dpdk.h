@@ -50,6 +50,14 @@ typedef struct __attribute__((__packed__))
 	uint8_t lcore_index;
 } DpdkPortConfig_t;
 
+#ifndef RTE_MAX_ETHPORTS
+#define RTE_MAX_ETHPORTS 1
+#endif
+
+#ifndef RTE_MAX_QUEUES_PER_PORT
+#define RTE_MAX_QUEUES_PER_PORT 1
+#endif
+
 typedef struct __attribute__((__packed__))
 {
 	uint16_t pre_acl:1;
