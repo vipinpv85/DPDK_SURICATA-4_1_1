@@ -6,6 +6,13 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 
 ![dpdk-suricata](https://user-images.githubusercontent.com/1296097/62437531-3aef9000-b761-11e9-8c51-803cd9dddcc8.png)
 
+# Things to do
+
+ - [] allow packets to captured by Recieve and Decode threads
+ - [] implement SW or HW Symmetric Hashing for reassembled packets.
+ - [] flatten the packet buffer for full zero-copy mode.
+ - [] use SW or HW ACL for classification on directional rules.
+
 ## How to Build?
 
 ### dependency 
