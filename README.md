@@ -52,6 +52,6 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 
 | command | purpose |
 | -----|-----|
-| `./src/suricata --build-info; ./src/suricata --list-runmodess` | get suricata version and supported modes |
+| `./src/suricata --build-info; ./src/suricata --list-runmodes` | get suricata version and supported modes |
 | `./src/suricata --list-dpdkports` | list DPDK available ports |
 | `./src/suricata --dpdk=<path to to config>/mysuricata.cfg` | Run DPDK suircata with mysuricata.cfg |
