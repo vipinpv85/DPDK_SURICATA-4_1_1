@@ -1,5 +1,7 @@
 # DPDK_SURICATA-4_1_1
 
+Planning to merge ACL from 3.0 with dpdk 19.11.
+
 ## Motivation
 
 Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mode. First step to speed up suricata open source user space application using DPDK PMD
