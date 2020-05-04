@@ -150,7 +150,7 @@ int SetupDdpdkPorts(void)
 	struct rte_eth_conf port_conf = {
 		.rxmode = {
 			.mq_mode = ETH_MQ_RX_RSS,
-			.max_rx_pkt_len = ETHER_MAX_LEN,
+			.max_rx_pkt_len = RTE_ETHER_MAX_LEN,
 			.split_hdr_size = 0,
 		},
 		.rx_adv_conf = {
@@ -165,7 +165,7 @@ int SetupDdpdkPorts(void)
 	if (rte_mempool_lookup(dpdk_mempool_config.name) == NULL) {
 		dpdk_mempool_config.mbuf_ptr = rte_pktmbuf_pool_create(
 				dpdk_mempool_config.name, dpdk_mempool_config.n,
-				/* MEMPOOL_CACHE_SIZE*/ 256, dpdk_mempool_config.private_data_size,
+				/* MEMPOOL_CACHE_SIZE*/ 256, (dpdk_mempool_config.private_data_size == 0)? sizeof(Packet):dpdk_mempool_config.private_data_size,
 				RTE_MBUF_DEFAULT_BUF_SIZE, dpdk_mempool_config.socket_id);
 	}
 	if (dpdk_mempool_config.mbuf_ptr == NULL) {
@@ -247,14 +247,15 @@ int SetupDdpdkPorts(void)
 		}
 
 		rte_eth_promiscuous_enable(i);
+	}
 
-		/* check lcore_index for the given port is valid */
-		if (dpdk_ports[i].lcore_index >= rte_lcore_count()) {
-			SCLogError(SC_ERR_DPDK_CONFIG, " Mismatch for lcore_index (%u) for port [%d]",
-					dpdk_ports[i].lcore_index, i);
+#if 0
+		/* check if enough lcore are present to run the logic */
+		if ( >= rte_lcore_count()) {
+			SCLogError(SC_ERR_DPDK_CONFIG, "Expects (%d) lcores for (%d) port, availble lcores (%d)!", GetDpdkPort());
 			return -EINVAL;
 		}
-	}
+#endif
 
 #endif
 
@@ -542,8 +543,11 @@ void *ParseDpdkConfig(const char *dpdkCfg)
 						dpdk_ports[i].rss_tuple = atoi(entries[j].value);
 					else if (strcasecmp("jumbo", entries[j].name) == 0)
 						dpdk_ports[i].jumbo = (strcasecmp(entries[j].value, "yes") == 0) ? 1 : 0;
-					else if (strcasecmp("core", entries[j].name) == 0)
-						dpdk_ports[i].lcore_index = atoi(entries[j].value);
+					else if (strcasecmp("core", entries[j].name) == 0) {
+						int lcoreindex = atoi(entries[j].value);
+						SCLogNotice(" - lcore index is %d, rte_lcore_count %d ", lcoreindex, rte_lcore_count());
+						dpdk_config.lcore_index_map[rte_lcore_count() % 64] |= 1 << lcoreindex;
+					}
 				}
 			}
 		}
@@ -665,26 +669,28 @@ int RunModeDpdkWorkers(void)
 		}
 		TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
 
-        tm_module = TmModuleGetByName("FlowWorker");
-        if (tm_module == NULL) {
-            SCLogError(SC_ERR_RUNMODE, "TmModuleGetByName for FlowWorker failed");
-            exit(EXIT_FAILURE);
-        }
-        TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
+		tm_module = TmModuleGetByName("FlowWorker");
+		if (tm_module == NULL) {
+			SCLogError(SC_ERR_RUNMODE, "TmModuleGetByName for FlowWorker failed");
+			exit(EXIT_FAILURE);
+		}
+		TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
 
-        tm_module = TmModuleGetByName("RespondReject");
-        if (tm_module == NULL) {
-            printf("ERROR: TmModuleGetByName for RespondReject failed\n");
-            exit(EXIT_FAILURE);
-        }
-        TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
+		tm_module = TmModuleGetByName("RespondReject");
+		if (tm_module == NULL) {
+			printf("ERROR: TmModuleGetByName for RespondReject failed");
+			exit(EXIT_FAILURE);
+		}
+		TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
 
-	if (TmThreadSpawn(tv_worker) != TM_ECODE_OK) {
-		printf("ERROR: TmThreadSpawn failed\n");
-		exit(EXIT_FAILURE);
-	}
+		TmThreadSetCPU(tv_worker, WORKER_CPU_SET);
 
+		if (TmThreadSpawn(tv_worker) != TM_ECODE_OK) {
+			printf("ERROR: TmThreadSpawn failed\n");
+			exit(EXIT_FAILURE);
+		}
 
+		SCLogNotice(" ceated %s for count %d ", tname, i);
 	}
 
 
@@ -727,14 +733,8 @@ int DpdkGetRxThreads(void)
 	int ret = 0;
 
 #ifdef HAVE_DPDK
-	int i = 0, current_lcore = -1;
-	RTE_ETH_FOREACH_DEV(i)
-	{
-		if (current_lcore != dpdk_ports[i].lcore_index) {
-			ret += 1;
-			current_lcore = dpdk_ports[i].lcore_index;
-		}
-	}
+	for (int i = 0; i < (1 + (RTE_MAX_LCORE / 64)); i++)
+		ret += __builtin_popcountll(dpdk_config.lcore_index_map[i]);
 #else
 	SCLogInfo("\n ERROR: DPDK not supported!");
 #endif

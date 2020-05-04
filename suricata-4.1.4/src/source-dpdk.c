@@ -52,7 +52,7 @@
 
 #ifdef HAVE_DPDK
 
-//#include ""
+#include "source-dpdk.h"
 
 /** storage for mpipe device names */
 typedef struct DpdkDevice_ {
@@ -82,10 +82,25 @@ typedef struct DpdkThreadVars_
 
     Packet *in_p;
 
+	/* dpdk params */
+	uint16_t portQueuePairCount;
+	uint64_t portQueuePair[RTE_MAX_ETHPORTS * RTE_MAX_QUEUES_PER_PORT];
+
     /** stats/counters */
+	uint64_t count_emptyrx;
+	uint64_t count_failtx;
+	uint64_t count_ipv4frag;
+	uint64_t count_ipv6frag;
+	uint64_t count_ipv4;
+	uint64_t count_ipv6;
+	uint64_t count_acllkpsucc;
+	uint64_t count_acllkpfail;
+	uint64_t count_acllkphit;
+	uint64_t count_acllkpmiss;
+	uint64_t count_recverr;
+	uint64_t count_decodeerr;
 } DpdkThreadVars;
 
-#if HAVE_DPDK
 TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot);
 TmEcode ReceiveDpdkInit(ThreadVars *, void *, void **);
 TmEcode ReceiveDpdkDeinit(ThreadVars *, void *);
@@ -94,9 +109,8 @@ void ReceiveDpdkThreadExitStats(ThreadVars *, void *);
 TmEcode DecodeDpdkThreadInit(ThreadVars *, void *, void **);
 TmEcode DecodeDpdkThreadDeinit(ThreadVars *tv, void *data);
 TmEcode DecodeDpdk(ThreadVars *, Packet *, void *, PacketQueue *, PacketQueue *);
-#else
-TmEcode NoDpdkSupportExit(ThreadVars *, void *, void **);
 #endif
+TmEcode NoDpdkSupportExit(ThreadVars *, const void *, void **);
 
 /*
  * dpdk configuration.
@@ -119,12 +133,10 @@ void TmModuleReceiveDpdkRegister (void)
 	SCEnter();
 	SCLogDebug(" dpdk support");
 
-#if 0
-        SCLogNotice(" - pre_acl (%u)", dpdk_config.pre_acl);
-        SCLogNotice(" - post_acl (%u)", dpdk_config.post_acl);
-        SCLogNotice(" - rx_reassemble (%u)", dpdk_config.rx_reassemble);
-        SCLogNotice(" - tx_fragment (%u)", dpdk_config.tx_fragment);
-#endif
+	//SCLogNotice(" - pre_acl (%u)", dpdk_config.pre_acl);
+	//SCLogNotice(" - post_acl (%u)", dpdk_config.post_acl);
+	//SCLogNotice(" - rx_reassemble (%u)", dpdk_config.rx_reassemble);
+	//SCLogNotice(" - tx_fragment (%u)", dpdk_config.tx_fragment);
 
 	tmm_modules[TMM_RECEIVEDPDK].name = "ReceiveDPDK";
 	tmm_modules[TMM_RECEIVEDPDK].ThreadInit = ReceiveDpdkInit;
@@ -158,10 +170,10 @@ void TmModuleReceiveDPDKRegister (void)
 }
 #endif
 
-#ifdef HAVE_DPDK
 void TmModuleDecodeDpdkRegister (void)
 {
 	SCEnter();
+#ifdef HAVE_DPDK
 	SCLogDebug(" dpdk support");
 
 	tmm_modules[TMM_DECODEDPDK].name = "DecodeDPDK";
@@ -172,13 +184,8 @@ void TmModuleDecodeDpdkRegister (void)
 	tmm_modules[TMM_DECODEDPDK].RegisterTests = NULL;
 	tmm_modules[TMM_DECODEDPDK].cap_flags = 0;
 	tmm_modules[TMM_DECODEDPDK].flags = TM_FLAG_DECODE_TM;
-
-	SCReturn;
-}
 #else
-void TmModuleDecodeAFPRegister (void)
-{
-	SCEnter();
+
 	SCLogDebug(" no dpdk support");
 
 	tmm_modules[TMM_DECODEDPDK].name = "DecodeDPDK";
@@ -190,9 +197,9 @@ void TmModuleDecodeAFPRegister (void)
 	tmm_modules[TMM_DECODEDPDK].cap_flags = 0;
 	tmm_modules[TMM_DECODEDPDK].flags = TM_FLAG_DECODE_TM;
 
+#endif
 	SCReturn;
 }
-#endif
 
 /* Release Packet without sending. */
 void DpdkReleasePacket(Packet *p)
@@ -217,59 +224,6 @@ void DpdkReleasePacketCopyIPS(Packet *p)
     }
 }
 
-/**
- * \brief Dpdk Packet Process function.
- *
- * This function fills in our packet structure from mpipe.
- * From here the packets are picked up by the  DecodeMpipe thread.
- *
- * \param user pointer to MpipeThreadVars passed from pcap_dispatch
- * \param h pointer to gxio packet header
- * \param pkt pointer to current packet
- */
-static inline 
-Packet *DpdkProcessPacket(DpdkThreadVars *ptv, struct rte_mbuf *idesc)
-{
-    int caplen = 0 /*idesc->l2_size*/;
-    u_char *pkt = idesc /*rte_pktmbuf_mtod(idesc)*/;
-    Packet *p = (Packet *)(pkt - sizeof(Packet)/* - headroom/*2*/);
-
-    PACKET_RECYCLE(p);
-    PKT_SET_SRC(p, PKT_SRC_WIRE);
-
-    ptv->bytes += caplen;
-    ptv->pkts++;
-
-    gettimeofday(&p->ts, NULL);
-
-    p->datalink = LINKTYPE_ETHERNET;
-    /* No need to check return value, since the only error is pkt == NULL which can't happen here. */
-    PacketSetData(p, pkt, caplen);
-
-    /* copy only the fields we use later */
-#if 0
-    p->mpipe_v.idesc.bucket_id = idesc->bucket_id;
-    p->mpipe_v.idesc.nr = idesc->nr;
-    p->mpipe_v.idesc.cs = idesc->cs;
-    p->mpipe_v.idesc.va = idesc->va;
-    p->mpipe_v.idesc.stack_idx = idesc->stack_idx;
-    MpipePeerVars *equeue_info = &channel_to_equeue[idesc->channel];
-    if (equeue_info->copy_mode != MPIPE_COPY_MODE_NONE) {
-        p->mpipe_v.idesc.size = idesc->size;
-        p->mpipe_v.idesc.l2_size = idesc->l2_size;
-        p->mpipe_v.idesc.channel = idesc->channel;
-        p->ReleasePacket = equeue_info->ReleasePacket;
-    } else {
-        p->ReleasePacket = MpipeReleasePacket;
-    }
-
-    if (ptv->checksum_mode == CHECKSUM_VALIDATION_DISABLE)
-        p->flags |= PKT_IGNORE_CHECKSUM;
-#endif
-
-    return p;
-}
-
 static void SendNoOpPacket(ThreadVars *tv, TmSlot *slot)
 {
     Packet *p = PacketPoolGetPacket();
@@ -291,17 +245,25 @@ static void SendNoOpPacket(ThreadVars *tv, TmSlot *slot)
 TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 {
 	SCEnter();
-	SCLogDebug(" Loop to fetch and put packets");
-	SCReturnInt(TM_ECODE_OK);
 
-#if 0
-    DpdkThreadVars *ptv = (DpdkThreadVars *)data;
-    TmSlot *s = (TmSlot *)slot;
-    ptv->slot = s->slot_next;
-    Packet *p = NULL;
-    int rank = tv->rank;
-    int max_queued = 0;
-    char *ctype;
+	SCLogDebug(" Loop to fetch and put packets");
+
+#if HAVE_DPDK
+	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
+	TmSlot *s = (TmSlot *)slot;
+	//ptv->slot = s->slot_next;
+	Packet *p = NULL;
+	int rank = tv->rank;
+	int max_queued = 0;
+	char *ctype;
+
+	if (unlikely(ptv == NULL)) {
+		while (1);
+		SCLogDebug(" running %s on %d core %d\n", __func__, pthread_self(), sched_getcpu());
+		SCReturnInt(TM_ECODE_OK);
+	}
+
+	SCLogNotice("RX-TX Intf Id in %d out %d\n", ptv->portQueuePair[0] & 0xffff, (ptv->portQueuePair[0] >> 32)&0xffff);
 
 #if 0
     ptv->checksum_mode = CHECKSUM_VALIDATION_DISABLE;
@@ -335,6 +297,21 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
             for (i = 0; i < m; i++) {
                 __insn_prefetch(&idesc[i]);
             }
+            if (unlikely(n > max_queued)) {
+                StatsSetUI64(tv, ptv->max_mpipe_depth,
+                                     (uint64_t)n);
+                max_queued = n;
+            }
+            for (i = 0; i < m; i++, idesc++) {
+                if (likely(!gxio_mpipe_idesc_has_error(idesc))) {
+                    p = MpipeProcessPacket(ptv, idesc);
+                    p->mpipe_v.rank = rank;
+                    if (TmThreadsSlotProcessPkt(ptv->tv, ptv->slot, p) != TM_ECODE_OK) {
+                        TmqhOutputPacketpool(ptv->tv, p);
+                        SCReturnInt(TM_ECODE_FAILED);
+                    }
+                } else {
+                    if (idesc->be) {
             if (unlikely(n > max_queued)) {
                 StatsSetUI64(tv, ptv->max_mpipe_depth,
                                      (uint64_t)n);
@@ -387,42 +364,21 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 #endif
 
     SCReturnInt(TM_ECODE_OK);
-#endif
 }
-
-static void DpdkRegisterPerfCounters(DpdkThreadVars *ptv, ThreadVars *tv)
-{
-    /* register counters */
-#if 0
-    ptv->max_mpipe_depth = StatsRegisterCounter("mpipe.max_mpipe_depth", tv);
-    ptv->mpipe_drop = StatsRegisterCounter("mpipe.drop", tv);
-    ptv->counter_no_buffers_0 = StatsRegisterCounter("mpipe.no_buf0", tv);
-    ptv->counter_no_buffers_1 = StatsRegisterCounter("mpipe.no_buf1", tv);
-    ptv->counter_no_buffers_2 = StatsRegisterCounter("mpipe.no_buf2", tv);
-    ptv->counter_no_buffers_3 = StatsRegisterCounter("mpipe.no_buf3", tv);
-    ptv->counter_no_buffers_4 = StatsRegisterCounter("mpipe.no_buf4", tv);
-    ptv->counter_no_buffers_5 = StatsRegisterCounter("mpipe.no_buf5", tv);
-    ptv->counter_no_buffers_6 = StatsRegisterCounter("mpipe.no_buf6", tv);
-    ptv->counter_no_buffers_7 = StatsRegisterCounter("mpipe.no_buf7", tv);
-#endif
-}
-
 
 TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 {
 	SCEnter();
+	SCLogNotice(" Kick start threads \n");
 
-	fprintf(stderr, " Kick start DPDK threads using rte_eal_remote launch \n\n\n\n\n");
-
-#if 0
-    DpdkThreadVars *ptv = SCMalloc(sizeof(DpdkThreadVars));
+#if HAVE_DPDK
+	DpdkThreadVars *ptv = rte_zmalloc(NULL, sizeof(DpdkThreadVars), 0);
     if (unlikely(ptv == NULL))
         SCReturnInt(TM_ECODE_FAILED);
 
-    memset(ptv, 0, sizeof(DpdkThreadVars));
+	ptv->tv = tv;
 
-    ptv->tv = tv;
-
+#if 0
     int result;
     const char *link_name = (char *)initdata;
 
@@ -437,6 +393,7 @@ TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
     }
 #endif
 
+#endif
 	SCLogNotice("completed thread initialization for dpdk receive\n");
 	SCReturnInt(TM_ECODE_OK);
 }
@@ -446,24 +403,7 @@ TmEcode ReceiveDpdkDeinit(ThreadVars *tv, void *data)
 {
 	SCEnter();
 
-	fprintf(stderr, " wait for DPDK threads using rte_eal_wait \n\n\n\n\n");
-
 #if 0
-    DpdkThreadVars *ptv = SCMalloc(sizeof(DpdkThreadVars));
-    if (unlikely(ptv == NULL))
-        SCReturnInt(TM_ECODE_FAILED);
-
-    memset(ptv, 0, sizeof(DpdkThreadVars));
-
-    ptv->tv = tv;
-
-    int result;
-    const char *link_name = (char *)initdata;
-
-    *data = (void *)ptv;
-
-    /* Initialize and configure mPIPE, which is only done by one core. */
-
     if (strcmp(link_name, "multi") == 0) {
         int nlive = LiveGetDeviceCount();
     } else {
@@ -487,6 +427,7 @@ TmEcode DecodeDpdkThreadInit(ThreadVars *tv, void *initdata, void **data)
     SCEnter();
 	SCLogNotice(" inside decode thread");
 
+#if HAVE_DPDK
     DecodeThreadVars *dtv = NULL;
 
     dtv = DecodeThreadVarsAlloc(tv);
@@ -497,6 +438,7 @@ TmEcode DecodeDpdkThreadInit(ThreadVars *tv, void *initdata, void **data)
     DecodeRegisterPerfCounters(dtv, tv);
 
     *data = (void *)dtv;
+#endif
 
     SCReturnInt(TM_ECODE_OK);
 }
@@ -514,6 +456,7 @@ TmEcode DecodeDpdk(ThreadVars *tv, Packet *p, void *data, PacketQueue *pq,
     SCEnter();
     DecodeThreadVars *dtv = (DecodeThreadVars *)data;
 
+#if HAVE_DPDK
     /* XXX HACK: flow timeout can call us for injected pseudo packets
      *           see bug: https://redmine.openinfosecfoundation.org/issues/1107 */
     if (p->flags & PKT_PSEUDO_STREAM_END)
@@ -543,6 +486,7 @@ int DpdkLiveRegisterDevice(char *dev)
         return -1;
     }
     TAILQ_INSERT_TAIL(&dpdk_devices, nd, next);
+#endif
 
     SCLogDebug("DPDK device \"%s\" registered.", dev);
     return 0;

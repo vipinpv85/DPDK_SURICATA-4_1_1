@@ -48,6 +48,7 @@
 
 #include "rte_eal.h"
 #include "rte_launch.h"
+#include "rte_malloc.h"
 
 #define SUIRCATA_DPDK_MAXARGS 16
 #define InitDpdkSuricata(a, b) rte_eal_init(a, (char **)b)

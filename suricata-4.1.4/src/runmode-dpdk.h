@@ -47,7 +47,6 @@ typedef struct __attribute__((__packed__))
 	uint16_t mtu;
 	uint8_t rss_tuple:2;
 	uint8_t jumbo:1;
-	uint8_t lcore_index;
 } DpdkPortConfig_t;
 
 #ifndef RTE_MAX_ETHPORTS
@@ -67,6 +66,7 @@ typedef struct __attribute__((__packed__))
 	uint16_t mode:2;
 	uint16_t portmap[RTE_MAX_ETHPORTS][2];
 	void *port_ring[RTE_MAX_ETHPORTS][RTE_MAX_QUEUES_PER_PORT];
+	uint64_t lcore_index_map[1 + (RTE_MAX_LCORE / 64)];
 } DpdkConfig_t;
 
 const char *RunModeDpdkGetDefaultMode(void);
