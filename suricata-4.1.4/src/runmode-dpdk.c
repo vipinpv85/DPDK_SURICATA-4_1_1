@@ -693,8 +693,12 @@ int RunModeDpdkWorkers(void)
 		SCLogNotice(" ceated %s for count %d ", tname, i);
 	}
 
+	SCLogInfo("RunMode DPDK workers initialised");
+#endif
+	SCReturnInt(ret);
+}
 
-#if 0
+#if DPDK-AF_WORKER
 	/* default run mode is worker */
 	ret = RunModeSetLiveCaptureWorkers(
 			DpdkConfigParser, DpdkGetThreadsCount,
@@ -708,14 +712,6 @@ int RunModeDpdkWorkers(void)
 	}
 #endif
 
-
-#if 0
-#endif
-
-	SCLogInfo("RunMode DPDK workers initialised");
-#endif
-	SCReturnInt(ret);
-}
 
 uint8_t GetRunMode(void)
 {

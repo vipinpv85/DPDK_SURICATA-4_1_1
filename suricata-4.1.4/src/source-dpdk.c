@@ -70,35 +70,34 @@ static TAILQ_HEAD(, DpdkDevice_) dpdk_devices =
  */
 typedef struct DpdkThreadVars_
 {
-    ChecksumValidationMode checksum_mode;
+	ChecksumValidationMode checksum_mode;
 
-    /* counters */
-    uint64_t pkts;
-    uint64_t bytes;
-    uint64_t errs;
+	ThreadVars *tv;
+	TmSlot *slot;
 
-    ThreadVars *tv;
-    TmSlot *slot;
-
-    Packet *in_p;
+	Packet *in_p;
 
 	/* dpdk params */
 	uint16_t portQueuePairCount;
 	uint64_t portQueuePair[RTE_MAX_ETHPORTS * RTE_MAX_QUEUES_PER_PORT];
 
-    /** stats/counters */
-	uint64_t count_emptyrx;
-	uint64_t count_failtx;
-	uint64_t count_ipv4frag;
-	uint64_t count_ipv6frag;
-	uint64_t count_ipv4;
-	uint64_t count_ipv6;
-	uint64_t count_acllkpsucc;
-	uint64_t count_acllkpfail;
-	uint64_t count_acllkphit;
-	uint64_t count_acllkpmiss;
-	uint64_t count_recverr;
-	uint64_t count_decodeerr;
+	/** stats/counters */
+	uint64_t pkts;
+	uint64_t bytes;
+	uint64_t errs;
+
+	uint64_t emptyrx;
+	uint64_t failtx;
+	uint64_t ipv4frag;
+	uint64_t ipv6frag;
+	uint64_t ipv4;
+	uint64_t ipv6;
+	uint64_t acllkp_succ;
+	uint64_t acllkp_fail;
+	uint64_t acllkp_hit;
+	uint64_t acllkp_miss;
+	uint64_t err_recv;
+	uint64_t err_decode;
 } DpdkThreadVars;
 
 TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot);
@@ -140,7 +139,7 @@ void TmModuleReceiveDpdkRegister (void)
 
 	tmm_modules[TMM_RECEIVEDPDK].name = "ReceiveDPDK";
 	tmm_modules[TMM_RECEIVEDPDK].ThreadInit = ReceiveDpdkInit;
-	tmm_modules[TMM_RECEIVEDPDK].Func = /*NULL*/ReceiveDpdkLoop;
+	tmm_modules[TMM_RECEIVEDPDK].Func = NULL;
 	tmm_modules[TMM_RECEIVEDPDK].PktAcqLoop = ReceiveDpdkLoop;
 	tmm_modules[TMM_RECEIVEDPDK].PktAcqBreakLoop = NULL;
 	tmm_modules[TMM_RECEIVEDPDK].ThreadExitPrintStats = ReceiveDpdkThreadExitStats;
@@ -257,10 +256,10 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 	int max_queued = 0;
 	char *ctype;
 
+	SCLogDebug(" running %s on %d core %d\n", __func__, pthread_self(), sched_getcpu());
+
 	if (unlikely(ptv == NULL)) {
-		while (1);
-		SCLogDebug(" running %s on %d core %d\n", __func__, pthread_self(), sched_getcpu());
-		SCReturnInt(TM_ECODE_OK);
+		SCReturnInt(TM_ECODE_FAILED);
 	}
 
 	SCLogNotice("RX-TX Intf Id in %d out %d\n", ptv->portQueuePair[0] & 0xffff, (ptv->portQueuePair[0] >> 32)&0xffff);
@@ -373,24 +372,15 @@ TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 
 #if HAVE_DPDK
 	DpdkThreadVars *ptv = rte_zmalloc(NULL, sizeof(DpdkThreadVars), 0);
-    if (unlikely(ptv == NULL))
-        SCReturnInt(TM_ECODE_FAILED);
+	if (unlikely(ptv == NULL))
+		SCReturnInt(TM_ECODE_FAILED);
 
 	ptv->tv = tv;
+	*data = (void *)ptv;
 
 #if 0
     int result;
     const char *link_name = (char *)initdata;
-
-    *data = (void *)ptv;
-
-    /* Initialize and configure mPIPE, which is only done by one core. */
-
-    if (strcmp(link_name, "multi") == 0) {
-        int nlive = LiveGetDeviceCount();
-    } else {
-        SCLogInfo("using single interface %s", (char *)initdata);
-    }
 #endif
 
 #endif
