@@ -31,26 +31,13 @@
 #ifndef __SOURCE_DPDK_H__
 #define __SOURCE_DPDK_H__
 
-#if 0
-#include <config.h>
-
-#include "rte_config.h"
-#include "rte_ethdev.h"
-#include "rte_ether.h"
-#include "rte_branch_prediction.h"
-
-#include "util-atomic.h"
-
-#define PFRING_IFACE_NAME_LENGTH 48
-#define DPDKINTEL_IFACE_NAME_LENGTH 5
-#define PREFETCH_OFFSET             4
-#endif
-
 #include "rte_eal.h"
 #include "rte_launch.h"
 #include "rte_malloc.h"
 
 #define SUIRCATA_DPDK_MAXARGS 16
+#define DPDK_ETH_NAME_SIZE 48
+
 #define InitDpdkSuricata(a, b) rte_eal_init(a, (char **)b)
 #define KillDpdkSuricata do {\
 	rte_eal_cleanup();\
@@ -58,13 +45,21 @@
 
 #if 0
 typedef int32_t (*launchPtr) (__attribute__((unused)) void *arg);
+#endif
 
-typedef struct DpdkIntelIfaceConfig
+typedef struct DpdkIfaceConfig
 {
-    char iface[DPDKINTEL_IFACE_NAME_LENGTH];
+	char in_iface[DPDK_ETH_NAME_SIZE];
+	char out_iface[DPDK_ETH_NAME_SIZE];
 
+	uint16_t portid;
+	uint16_t queueid;
+	uint16_t fwd_portid;
+	uint16_t fwd_queueid;
     /* number of threads */
-    int threads;
+	int threadid;
+	unsigned int lcoreid;
+	unsigned int lcoreindex;
 
     /* ring size in number of packets */
     int ringSize;
@@ -84,10 +79,8 @@ typedef struct DpdkIntelIfaceConfig
     char *bpfFilter;
     char *outIface;
 
-    SC_ATOMIC_DECLARE(unsigned int, ref);
-} DpdkIntelIfaceConfig_t;
-
-#endif
+    //SC_ATOMIC_DECLARE(unsigned int, ref);
+} DpdkIfaceConfig_t;
 
 
 void TmModuleReceiveDpdkRegister(void);

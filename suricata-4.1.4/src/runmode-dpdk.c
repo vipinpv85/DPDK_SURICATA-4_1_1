@@ -28,6 +28,7 @@
  * DPDK runmode support
  */
 #include "dpdk-include-common.h"
+#include "source-dpdk.h"
 
 #include "suricata-common.h"
 #include "tm-threads.h"
@@ -96,6 +97,8 @@ int CreateDpdkRing(void)
 #else
 	int i, ring_index = 0;
 	char ring_name[25] = {""};
+
+	SCLogNotice(" Creating (%d) Rings!", dpdk_num_pipelines);
 
 	for (i = 0; i < dpdk_num_pipelines; i++)
 	{
@@ -604,11 +607,69 @@ static void *DpdkConfigParser(const char *device)
 {
 	SCEnter();
 
-#ifdef HAVE_DPDK
-	SCLogNotice(" device (%s)", device);
+#ifndef HAVE_DPDK
+	SCLogInfo("\n ERROR: DPDK not supported!");
+#else
+	int ret = -1;
+	static uint16_t port = 0;
+	static uint16_t queue = 0;
+
+	struct rte_eth_dev_info dev_info;
+
+	char tname[50] = {""};
+	ThreadVars *tv_worker = NULL;
+	TmModule *tm_module = NULL;
+
+	DpdkIfaceConfig_t *config = rte_zmalloc(NULL, sizeof(DpdkIfaceConfig_t), 0);
+	if (config == NULL) {
+		SCLogError(SC_ERR_DPDK_MEM, " failed to alloc memory");
+		SCReturnPtr(NULL, "void *");
+	}
+
+	/* do I need this? */
+	//(void) SC_ATOMIC_INIT(config->ref, 1);
+
+	if (rte_eth_dev_info_get(port, &dev_info) != 0) {
+		SCLogError(SC_ERR_DPDK_CONFIG, " failed to get DPDK port (%d) details", port);
+		SCReturnPtr(NULL, "void *");
+	}
+
+	if (queue > dev_info.nb_rx_queues) {
+		port += 1;
+		queue = 0;
+	} else {
+		queue += 1;
+	}
+
+	config->portid = port;
+	config->queueid = queue;
+	config->fwd_portid = dpdk_config.portmap[port][1];
+	config->fwd_queueid = queue;
+
+	config->cluster_id = 1;
+	config->cluster_type = PACKET_FANOUT_HASH;
+	//config->cluster_type = PACKET_FANOUT_CPU;
+
+	snprintf(config->in_iface, DPDK_ETH_NAME_SIZE, "unknown-in-%u", port);
+	ret = rte_eth_dev_get_name_by_port(port, config->in_iface);
+	snprintf(config->out_iface, DPDK_ETH_NAME_SIZE, "unknown-out-%u", port);
+	ret = rte_eth_dev_get_name_by_port(port, config->out_iface);
+
+	config->promiscous = 1;
+	config->checksumMode =
+		(dev_info.default_rxconf.offloads & DEV_RX_OFFLOAD_CHECKSUM) ?
+		CHECKSUM_VALIDATION_RXONLY : CHECKSUM_VALIDATION_DISABLE;
+	config->bpfFilter = NULL;
+
+	config->flags = 0; /* what should be flags here? */
+	config->copy_mode = 0; /* need to check from suricata IPS/IDS/BYPASS */
+
+	/* do I need this? */
+	//(void) SC_ATOMIC_ADD(config->ref, 1);
+	return config;
+
 #endif
 
-	SCLogInfo("\n ERROR: DPDK not supported!");
 	SCReturnPtr(NULL, "void *");
 }
 
