@@ -56,10 +56,6 @@ typedef struct DpdkIfaceConfig
 	uint16_t queueid;
 	uint16_t fwd_portid;
 	uint16_t fwd_queueid;
-    /* number of threads */
-	int threadid;
-	unsigned int lcoreid;
-	unsigned int lcoreindex;
 
     /* ring size in number of packets */
     int ringSize;

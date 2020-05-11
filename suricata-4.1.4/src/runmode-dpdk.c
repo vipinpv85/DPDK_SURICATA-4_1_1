@@ -325,10 +325,9 @@ int ValidateDpdkConfig(void)
 		if (dpdk_config.mode == 1 /*IDS*/) {
 				for (int j = 0; j < inout_map_count; j++)
 				{
-					if (dpdk_config.portmap[j][0] != dpdk_config.portmap[j][1]) {
-						SCLogError(SC_ERR_DPDK_CONFIG, " Mode (%u); port in (%u) out (%u) is different\n",
+					if (dpdk_config.portmap[j][0] == dpdk_config.portmap[j][1]) {
+						SCLogWarning(SC_WARN_PROFILE, " Mode (%u); port in (%u) out (%u)\n",
 							dpdk_config.mode,  dpdk_config.portmap[j][0], dpdk_config.portmap[j][1]);
-						return -1;
 					}
 
 					rte_eth_link_get(dpdk_config.portmap[j][0], &link1);
@@ -467,6 +466,9 @@ int ParseDpdkYaml(void)
 
 								dpdk_config.portmap[inout_map_count][0] = atoi(val_fld[0]);
 								dpdk_config.portmap[inout_map_count][1] = atoi(val_fld[1]);
+
+								SCLogNotice(" in %u out %u ", dpdk_config.portmap[inout_map_count][0], dpdk_config.portmap[inout_map_count][1]);
+
 								inout_map_count += 1;
 							}
 						}
@@ -634,26 +636,29 @@ static void *DpdkConfigParser(const char *device)
 		SCReturnPtr(NULL, "void *");
 	}
 
-	if (queue > dev_info.nb_rx_queues) {
-		port += 1;
-		queue = 0;
-	} else {
-		queue += 1;
-	}
+	SCLogNotice(" port %u, rx queues %u", port, dev_info.nb_rx_queues);
 
 	config->portid = port;
 	config->queueid = queue;
 	config->fwd_portid = dpdk_config.portmap[port][1];
 	config->fwd_queueid = queue;
 
+	SCLogNotice(" ----- port %u queue %u", port, queue);
+	if ((queue + 1) < dev_info.nb_rx_queues) {
+		queue += 1;
+	} else {
+		port += 1;
+		queue = 0;
+	}
+
 	config->cluster_id = 1;
 	config->cluster_type = PACKET_FANOUT_HASH;
 	//config->cluster_type = PACKET_FANOUT_CPU;
 
-	snprintf(config->in_iface, DPDK_ETH_NAME_SIZE, "unknown-in-%u", port);
-	ret = rte_eth_dev_get_name_by_port(port, config->in_iface);
-	snprintf(config->out_iface, DPDK_ETH_NAME_SIZE, "unknown-out-%u", port);
-	ret = rte_eth_dev_get_name_by_port(port, config->out_iface);
+	snprintf(config->in_iface, DPDK_ETH_NAME_SIZE, "unknown-in-%u", config->portid);
+	ret = rte_eth_dev_get_name_by_port(config->portid, config->in_iface);
+	snprintf(config->out_iface, DPDK_ETH_NAME_SIZE, "unknown-out-%u", config->fwd_portid);
+	ret = rte_eth_dev_get_name_by_port(config->fwd_portid, config->out_iface);
 
 	config->promiscous = 1;
 	config->checksumMode =
@@ -664,7 +669,12 @@ static void *DpdkConfigParser(const char *device)
 	config->flags = 0; /* what should be flags here? */
 	config->copy_mode = 0; /* need to check from suricata IPS/IDS/BYPASS */
 
-	/* do I need this? */
+	SCLogNotice(" in (%s, %u, %u) out (%s, %u, %u) checksum %x",
+		config->in_iface, config->portid, config->queueid,
+		config->out_iface, config->fwd_portid, config->fwd_queueid,
+		config->checksumMode);
+
+ 	/* do I need this? */
 	//(void) SC_ATOMIC_ADD(config->ref, 1);
 	return config;
 
@@ -676,11 +686,12 @@ static void *DpdkConfigParser(const char *device)
 int RunModeDpdkWorkers(void)
 {
 	SCEnter();
-	int ret = -1;
 
 #ifndef HAVE_DPDK
 	SCLogInfo("\n ERROR: DPDK not supported!");
 #else
+	int ret = -1;
+	uint16_t rx_threads = DpdkGetRxThreads();
 	char tname[50] = {""};
 	ThreadVars *tv_worker = NULL;
 	TmModule *tm_module = NULL;
@@ -691,7 +702,7 @@ int RunModeDpdkWorkers(void)
 	/* dump dpdk application configuration */
 	DumpGlobalConfig();
 
-	for (int i = 0; i < DpdkGetRxThreads(); i++) {
+	for (int i = 0; i < rx_threads; i++) {
 		snprintf(tname, sizeof(tname), "%s%d", "DPDKRX-THREAD-", i);
 
 		tv_worker = TmThreadCreatePacketHandler(tname,
@@ -717,7 +728,13 @@ int RunModeDpdkWorkers(void)
 			SCLogError(SC_ERR_DPDK_CONFIG, " TmModuleGetByName failed for ReceiveDPDK");
 			exit(EXIT_FAILURE);
 		}
-		TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
+		void *recv_ptr = DpdkConfigParser(NULL);
+		if (recv_ptr == NULL) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " failed to create Data for RECV thread");
+			exit(EXIT_FAILURE);
+		}
+
+		TmSlotSetFuncAppend(tv_worker, tm_module, (void *)recv_ptr);
 
 		/*
 		 * If pre=acl is configured, use decode thread to process the frames.
@@ -792,6 +809,20 @@ int DpdkGetRxThreads(void)
 #ifdef HAVE_DPDK
 	for (int i = 0; i < (1 + (RTE_MAX_LCORE / 64)); i++)
 		ret += __builtin_popcountll(dpdk_config.lcore_index_map[i]);
+	SCLogNotice(" cores required from mysuricata.cfg is (%d)", ret);
+
+	ret = 0;
+	uint16_t ports =  rte_eth_dev_count_avail();
+	for (int i = 0; i < ports; i++) {
+		struct rte_eth_dev_info dev_info;
+		if (rte_eth_dev_info_get(i, &dev_info) == 0) {
+			SCLogNotice(" port (%u) queues (%u)", i, dev_info.nb_rx_queues);
+			ret += dev_info.nb_rx_queues;
+		}
+	}
+	SCLogNotice(" cores required from RX-Q is (%d)", ret);
+	/* get RX queues per port */
+	
 #else
 	SCLogInfo("\n ERROR: DPDK not supported!");
 #endif

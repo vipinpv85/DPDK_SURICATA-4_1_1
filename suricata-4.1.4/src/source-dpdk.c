@@ -77,6 +77,15 @@ typedef struct DpdkThreadVars_
 
 	Packet *in_p;
 
+	uint16_t portid;
+	uint16_t queueid;
+	uint16_t fwd_portid;
+	uint16_t fwd_queueid;
+	int flags;
+	int copy_mode;
+	uint8_t checksumMode;
+	uint8_t promiscous;
+
 	/* dpdk params */
 	uint16_t portQueuePairCount;
 	uint64_t portQueuePair[RTE_MAX_ETHPORTS * RTE_MAX_QUEUES_PER_PORT];
@@ -126,16 +135,11 @@ TmEcode NoDpdkSupportExit(ThreadVars *tv, const void *initdata, void **data)
 	exit(EXIT_FAILURE);
 }
 
-#ifdef HAVE_DPDK
 void TmModuleReceiveDpdkRegister (void)
 {
 	SCEnter();
+#ifdef HAVE_DPDK
 	SCLogDebug(" dpdk support");
-
-	//SCLogNotice(" - pre_acl (%u)", dpdk_config.pre_acl);
-	//SCLogNotice(" - post_acl (%u)", dpdk_config.post_acl);
-	//SCLogNotice(" - rx_reassemble (%u)", dpdk_config.rx_reassemble);
-	//SCLogNotice(" - tx_fragment (%u)", dpdk_config.tx_fragment);
 
 	tmm_modules[TMM_RECEIVEDPDK].name = "ReceiveDPDK";
 	tmm_modules[TMM_RECEIVEDPDK].ThreadInit = ReceiveDpdkInit;
@@ -147,13 +151,7 @@ void TmModuleReceiveDpdkRegister (void)
 	tmm_modules[TMM_RECEIVEDPDK].RegisterTests = NULL;
 	tmm_modules[TMM_RECEIVEDPDK].cap_flags = SC_CAP_NET_RAW;
 	tmm_modules[TMM_RECEIVEDPDK].flags = TM_FLAG_RECEIVE_TM;
-
-	SCReturn;
-}
 #else
-void TmModuleReceiveDPDKRegister (void)
-{
-	SCEnter();
 	SCLogDebug(" no dpdk support");
 
 	tmm_modules[TMM_RECEIVEDPDK].name = "ReceiveDPDK";
@@ -164,10 +162,10 @@ void TmModuleReceiveDPDKRegister (void)
 	tmm_modules[TMM_RECEIVEDPDK].RegisterTests = NULL;
 	tmm_modules[TMM_RECEIVEDPDK].cap_flags = 0;
 	tmm_modules[TMM_RECEIVEDPDK].flags = TM_FLAG_RECEIVE_TM;
+#endif
 
 	SCReturn;
 }
-#endif
 
 void TmModuleDecodeDpdkRegister (void)
 {
@@ -262,7 +260,8 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 		SCReturnInt(TM_ECODE_FAILED);
 	}
 
-	SCLogNotice("RX-TX Intf Id in %d out %d\n", ptv->portQueuePair[0] & 0xffff, (ptv->portQueuePair[0] >> 32)&0xffff);
+	//SCLogNotice("RX-TX Intf Id in %d out %d\n", ptv->portQueuePair[0] & 0xffff, (ptv->portQueuePair[0] >> 32)&0xffff);
+	SCLogDebug("RX-TX Intf Id in %d out %d\n", ptv->portid, ptv->fwd_portid);
 
 #if 0
     ptv->checksum_mode = CHECKSUM_VALIDATION_DISABLE;
@@ -368,22 +367,37 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 {
 	SCEnter();
-	SCLogNotice(" Kick start threads \n");
+	SCLogNotice(" Kick start thread \n");
 
 #if HAVE_DPDK
-	DpdkThreadVars *ptv = rte_zmalloc(NULL, sizeof(DpdkThreadVars), 0);
-	if (unlikely(ptv == NULL))
+	if (initdata == NULL) {
+		SCLogError(SC_ERR_DPDK_CONFIG, " init data is empty");
 		SCReturnInt(TM_ECODE_FAILED);
+	}
+
+	DpdkThreadVars *ptv = rte_zmalloc(NULL, sizeof(DpdkThreadVars), 0);
+	if (unlikely(ptv == NULL)) {
+		SCLogError(SC_ERR_DPDK_MEM, "failed to alloc memory");
+		SCReturnInt(TM_ECODE_FAILED);
+	}
 
 	ptv->tv = tv;
 	*data = (void *)ptv;
 
-#if 0
-    int result;
-    const char *link_name = (char *)initdata;
+	DpdkIfaceConfig_t *dpdkconf = (DpdkIfaceConfig_t *) initdata;
+
+	ptv->portid = dpdkconf->portid;
+	ptv->fwd_portid = dpdkconf->fwd_portid;
+	ptv->queueid = dpdkconf->queueid;
+	ptv->fwd_queueid = dpdkconf->fwd_queueid;
+	ptv->flags = dpdkconf->flags;
+	ptv->copy_mode = dpdkconf->copy_mode;
+	ptv->checksumMode = dpdkconf->checksumMode;
+	ptv->promiscous = dpdkconf->promiscous;
+
+	*data = (void *)ptv;
 #endif
 
-#endif
 	SCLogNotice("completed thread initialization for dpdk receive\n");
 	SCReturnInt(TM_ECODE_OK);
 }
@@ -392,6 +406,8 @@ TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 TmEcode ReceiveDpdkDeinit(ThreadVars *tv, void *data)
 {
 	SCEnter();
+
+	rte_free(data);
 
 #if 0
     if (strcmp(link_name, "multi") == 0) {
