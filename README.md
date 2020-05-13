@@ -64,3 +64,16 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 | `./src/suricata --build-info; ./src/suricata --list-runmodes` | get suricata version and supported modes |
 | `./src/suricata --list-dpdkports` | list DPDK available ports |
 | `./src/suricata --dpdk=<path to to config>/mysuricata.cfg` | Run DPDK suircata with mysuricata.cfg |
+
+## How to run on multiple NUMA sockets
+
+ - DPDK API makes use of Huge pages
+ - Pin the memory to per NUMA by editing EAL args
+ - Pin the worker threads by eiditing affinity in suricata.yaml
+
+```
+vim mysuricata.cfg
+under EAL append options '--socket-mem=1,1024' and '--scoket-limit=1,1024' for NUMA-1
+vim suricata.yaml
+under cpu-affinity update `worker-cpu-set` for desired NUMA-1 threads
+```
