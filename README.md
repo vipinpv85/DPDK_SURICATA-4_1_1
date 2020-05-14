@@ -77,3 +77,76 @@ under EAL append options '--socket-mem=1,1024' and '--scoket-limit=1,1024' for N
 vim suricata.yaml
 under cpu-affinity update `worker-cpu-set` for desired NUMA-1 threads
 ```
+
+## Work item in discussion with SURICATA team to merge
+
+```
+Introduction:
+1. DPDK is set of Hardware and Software library, that helps to run on userspace.
+2. DPDK process is classified as Primary & Secondary, where huge pages and devices are shared between them.
+3. For an existing application to be support DPDK; both build and code is to be changed.
+4. One can skip the DPDK lcore-threads and service-threads too. But has to invoke `rte_eal_init` and relevant library call.
+
+What mode to use: (to be decided - which one to support and start)
+
+1. Primary (singleton/monolithic):
+Pros:
+a) Suricata will run as Primary managing all DPDK PMD and Libraries.
+b) Requires access to hugepages and root permission.
+c) Does not need ASLR to be disabled.
+d) can run in baremetal CPU, VM, Docker too.
+e) can make use DPDK secondary apps like proc-info, pdump, any other custom secondary application.
+Cons:
+a) pausible to run as non root, but requires DPDK familirity.
+b) code becomes bulky.
+c) HW vendor or device offload, code needs to updated with generic API or SW fallback.
+
+2. Seocndary:
+Pros:
+a) Suricata will run as Secondary with zero or a little managment and setup code for PMD and Libraries.
+b) Requires access to hugepages and root permission.
+c) ASLR needs to be disabled, for consistent or hiigher chance of start.
+d) can run in baremetal CPU, VM, Docker too.
+e) Code becomes lighter.
+Cons:
+a) plausible to run as non-root, but requires DPDK familiarity.
+b) cannot make use of DPDK secondary apps like proc-info, pdump, any other custom secondary application.
+c) Need to probe the configuration settings for HW vendor or device offload.
+
+3. Detached Primary:
+Pros:
+a) Suricata will run as Primary, getting packets from another DPDK primary via memif/vhost/AF_XDP interface.
+b) Requires access to huge pages and root permission.
+c) can run in bare-metal CPU, VM, Docker too.
+d) Code becomes lighter because we are using SW generic NIC and offloads.
+e) all vendor-specific and non DPDK offloads can be run on the alternative process.
+f) Useful in scenarios where selected packet mirror can be implemented in HW, or SW and fed to DPDK.
+g)
+Cons:
+a) plausible to run as non-root, but requires DPDK familiarity.
+b) secondary apps like proc-info, pdump, any other custom secondary application works.
+c) can make use of XDP (eBPF) to redirect selected traffic too.
+
+How to do:
+1. There are ABI and API changes across DPDK releases.
+2. Use a long term stable release as de-facto for DPDK. example 19.11.1 LTS.
+3. Depending upon individual or distro releases not all NIC, HW or features are enabled.
+4. Identify and choose the most common NIC like memif/Pcap/tap/vhost for ease of build.
+5. Update `configure.ac` to reflect
+a) $RTE_SDK & $RTE_TARGET for custom or distro dpdk package.
+b) edit for new field `--enable-dpdk` as flag
+c) add necessary changes for CFLAGS and LDFLAGS if flag is enabled.
+6. Add Compiler flag `HAVE_DPDK` to build for DPDK mode.
+7. Start for single and multi worker mode.
+8. Code changes in
+a) suricata.c: for DPDK initialization, run-mode registration, parse of suricata.yaml for DPDK sections and add-hook to Rules Add for DPDK ACL.
+b) source-dpdk, run mode-dpdk: new files to support DPDK configuration and worker threads.
+
+Proof of concept with single worker mode: https://github.com/vipinpv85/DPDK-Suricata_3.0
+ongoing work with multi-worker: https://github.com/vipinpv85/DPDK_SURICATA-4_1_1
+
+Performance: by redirecting rule match packets to worker threads
+1. 1 worker can perform around 2.5 Mpps
+2. 10Gbps with line rate (64byte) we need to 6 workers with each worker having 2.5Mpps flows
+3. 40Gbps with line rate (128byte) we need 16 worker threads with 2.5Mpps flows each.
+```
