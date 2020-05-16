@@ -267,7 +267,7 @@ static struct rte_acl_field_def ip6_defs[IP6_NUM] = {
 RTE_ACL_RULE_DEF(acl4_rule, RTE_DIM(ip4_defs));
 RTE_ACL_RULE_DEF(acl6_rule, RTE_DIM(ip6_defs));
 
-#define SUIRCATA_DPDK_MAXARGS 16
+#define SUIRCATA_DPDK_MAXARGS 32
 
 static DpdkMempool_t dpdk_mempool_config;
 static DpdkAclConfig_t dpdk_acl_config;
@@ -614,8 +614,38 @@ int CreateDpdkAcl(void)
 #ifndef HAVE_DPDK
 	SCLogInfo(" not configured for DPDK");
 #else
-	if (dpdk_config.pre_acl)
+	if (dpdk_config.pre_acl) {
 		SCLogDebug(" PRE-ACL to create!");
+
+		struct rte_acl_param acl_param;
+		struct rte_acl_ctx *ctx;
+
+		acl_param.socket_id = 0;
+		acl_param.max_rule_num = dpdk_acl_config.acl4_rules;
+
+		/* setup acl - IPv4 */
+		acl_param.rule_size = RTE_ACL_RULE_SZ(RTE_DIM(ip4_defs));
+		acl_param.name = "suricata-ipv4";
+		ctx = rte_acl_create(&acl_param);
+		if ((ctx == NULL) || (rte_acl_set_ctx_classify(ctx, RTE_ACL_CLASSIFY_SSE))) {
+			SCLogError(SC_ERR_MISSING_CONFIG_PARAM, "acl ipv4 fail!!!");
+			exit(EXIT_FAILURE);
+		}
+		SCLogNotice("DPDK ipv4AclCtx: %p done!", ctx);
+		dpdk_acl_config.ipv4AclCtx = (void *)ctx;
+
+		/* setup acl - IPv6 */
+		acl_param.max_rule_num = dpdk_acl_config.acl6_rules;
+		acl_param.rule_size = RTE_ACL_RULE_SZ(RTE_DIM(ip6_defs));
+		acl_param.name = "suricata-ipv6";
+		ctx = rte_acl_create(&acl_param);
+		if ((ctx == NULL) || (rte_acl_set_ctx_classify(ctx, RTE_ACL_CLASSIFY_SSE))){
+		SCLogError(SC_ERR_MISSING_CONFIG_PARAM, "acl ipv6 fail!!!");
+		exit(EXIT_FAILURE);
+		}
+		SCLogNotice("DPDK ipv6AclCtx: %p done!", ctx);
+		dpdk_acl_config.ipv6AclCtx = (void *)ctx;
+	}
 	else
 		SCLogDebug(" PRE-ACL need not to create!");
 
