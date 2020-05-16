@@ -50,6 +50,7 @@
 #define SUIRCATA_DPDK_MAXARGS 16
 
 static DpdkMempool_t dpdk_mempool_config;
+static DpdkAclConfig_t dpdk_acl_config;
 static DpdkConfig_t dpdk_config;
 static DpdkPortConfig_t dpdk_ports[RTE_MAX_ETHPORTS];
 
@@ -168,9 +169,12 @@ int SetupDdpdkPorts(void)
 	if (rte_mempool_lookup(dpdk_mempool_config.name) == NULL) {
 		dpdk_mempool_config.mbuf_ptr = rte_pktmbuf_pool_create(
 				dpdk_mempool_config.name, dpdk_mempool_config.n,
-				/* MEMPOOL_CACHE_SIZE*/ 256, (dpdk_mempool_config.private_data_size == 0)? sizeof(Packet):dpdk_mempool_config.private_data_size,
-				RTE_MBUF_DEFAULT_BUF_SIZE, dpdk_mempool_config.socket_id);
+				/* MEMPOOL_CACHE_SIZE*/ 256,
+				(dpdk_mempool_config.private_data_size == 0)? sizeof(Packet):dpdk_mempool_config.private_data_size,
+				RTE_MBUF_DEFAULT_BUF_SIZE,
+				dpdk_mempool_config.socket_id);
 	}
+
 	if (dpdk_mempool_config.mbuf_ptr == NULL) {
 		SCLogError(SC_ERR_DPDK_CONFIG, "Failed to create mbuf pool!\n");
 		return -EINVAL;
@@ -584,6 +588,36 @@ void *ParseDpdkConfig(const char *dpdkCfg)
 		}
 	}
 
+/* get section name ACL-IPV4 */
+if (rte_cfgfile_has_section(file, "ACL-IPV4")) {
+	int n_entries = rte_cfgfile_section_num_entries(file, "ACL-IPV4");
+	struct rte_cfgfile_entry entries[n_entries];
+
+	SCLogDebug(" section Name: ACL-IPv4 with entries %d", n_entries);
+	if (rte_cfgfile_section_entries(file, "ACL-IPV4", entries, n_entries) != -1) {
+		for (int j = 0; j < n_entries; j++) {
+			SCLogDebug(" - entries[i] name (%s) val (%s)", entries[j].name, entries[j].value);
+			if (strcasecmp("rule_count", entries[j].name) == 0)
+				dpdk_acl_config.acl4_rules = atoi(entries[j].value);
+		}
+	}
+}
+
+/* get section name ACL-IPV6 */
+if (rte_cfgfile_has_section(file, "ACL-IPV6")) {
+	int n_entries = rte_cfgfile_section_num_entries(file, "ACL-IPV6");
+	struct rte_cfgfile_entry entries[n_entries];
+
+	SCLogDebug(" section Name: ACL-IPv6 with entries %d", n_entries);
+	if (rte_cfgfile_section_entries(file, "ACL-IPV6", entries, n_entries) != -1) {
+		for (int j = 0; j < n_entries; j++) {
+			SCLogDebug(" - entries[i] name (%s) val (%s)", entries[j].name, entries[j].value);
+			if (strcasecmp("rule_count", entries[j].name) == 0)
+				dpdk_acl_config.acl6_rules = atoi(entries[j].value);
+		}
+	}
+}
+
 	rte_cfgfile_close(file);
 #else
 	SCLogInfo(" not configured for ParseDpdkConfig");
@@ -599,8 +633,9 @@ static int DpdkGetThreadsCount(void *conf __attribute__((unused)))
 
 #ifdef HAVE_DPDK
 	ret = rte_lcore_count();
-#endif
+#else
 	SCLogInfo("\n ERROR: DPDK not supported!");
+#endif
 
 	SCReturnInt(ret);
 }
