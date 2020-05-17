@@ -17,10 +17,11 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
  - [ ] cleanup logs and debug points
 
 # Things completed
- - allow multiple worker rather than single worker
- - allow multiple RX queue with RSS (default)
- - add dpdk fields to suricata.yaml
- - migrate to DPDk 19.11.1 LTS
+ - [x] allow multiple worker rather than single worker
+ - [x] allow multiple RX queue with RSS (default)
+ - [x] add dpdk fields to suricata.yaml
+ - [x] migrate to DPDK 19.11.1 LTS
+ - [x] use rx-callback to filter packets which are non-ip
 
 ## How to Build?
 
