@@ -511,36 +511,44 @@ static int SetupDdpdkPorts(void)
 
 		/* add call back to filter non-ip packets */
 		uint32_t ptypes[16];
+		uint32_t toset_ptypes[16];
+		int index = 0;
 		uint32_t ptype_mask = RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6;
 
 		int hw_filter = 0;
 		int num_ptypes = rte_eth_dev_get_supported_ptypes(i, ptype_mask, ptypes, RTE_DIM(ptypes));
 		if (num_ptypes > 0) {
-			for (int j =0; j < num_ptypes; j++) {
-				hw_filter = (uint8_t)((ptypes[j] & RTE_PTYPE_L4_UDP) == RTE_PTYPE_L4_UDP);
-				if (hw_filter)
-					break;
+			for (int j =0; (j < num_ptypes) && (hw_filter != 3); j++) {
+				if (ptypes[j] & RTE_PTYPE_L3_IPV4) {
+					hw_filter |= 1;
+					toset_ptypes[index++] = ptypes[j];
+				}
+				if (ptypes[j] & RTE_PTYPE_L3_IPV6)
+					hw_filter |= 2;
+					toset_ptypes[index++] = ptypes[j];
+				}
 			}
 
-			if (hw_filter) {
-				if (rte_eth_dev_set_ptypes(i, ptype_mask, &ptypes[j], 1) != 0) {
+			if (hw_filter == 3) {
+					printf(" ptype filter for v4 and v6 \n");
+				if (rte_eth_dev_set_ptypes(i, ptype_mask, &toset_ptypes[j], index) != 0) {
 					hw_filter = 0;
 				}
 			}
-		}
 
-		for (int q = 0; q < dpdk_ports[i].rxq_count; q++) {
-			if (rte_eth_add_rx_callback(i, q, 
-				(dpdk_config.mode == 1) ? ((hw_filter) ? dpdk_mbuf_ptype_fiter_nonip_ids : dpdk_sw_fiter_nonip_ids) :
-				(hw_filter) ? dpdk_mbuf_ptype_fiter_nonip : dpdk_sw_fiter_nonip,
-				NULL) == NULL) {
-				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to configure callback on port (%d)!", i);
-				return -EINVAL;
+			for (int q = 0; q < dpdk_ports[i].rxq_count; q++) {
+				if (rte_eth_add_rx_callback(i, q,
+					(dpdk_config.mode == 1) ?
+						((hw_filter) ? dpdk_mbuf_ptype_fiter_nonip_ids : dpdk_sw_fiter_nonip_ids) :
+						((hw_filter) ? dpdk_mbuf_ptype_fiter_nonip : dpdk_sw_fiter_nonip),
+					NULL) == NULL) {
+					SCLogError(SC_ERR_DPDK_CONFIG, "Failed to configure callback on port (%d)!", i);
+					return -EINVAL;
+				}
 			}
-		}
 
-		/* add call back to pre-filter ACL */
-	}
+			/* add call back to pre-filter ACL */
+		}
 
 #if 0
 		/* check if enough lcore are present to run the logic */
@@ -1331,14 +1339,14 @@ dpdk_mbuf_ptype_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_
 		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
 {
 	int i = 0, j = 0;
+	uint32_t ptype_ipmask = RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6;
 
 	for (; i < nb_pkts; i++) {
 		struct rte_mbuf *m = pkts[i];
 
 		//rte_pktmbuf_dump(stdout, m, m->pkt_len);
 
-		if (((m->packet_type & (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4)) != (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4)) ||
-			((m->packet_type & (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4)) != (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV6)) ) {
+		if (!(m->packet_type & ptype_ipmask)) {
 			rte_pktmbuf_free(m);
 			continue;
 		}
@@ -1354,6 +1362,7 @@ dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unus
 		struct rte_mbuf **pkts, uint16_t nb_pkts,
 		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
 {
+	uint32_t ptype_ipmask = RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6;
 	int i = 0, j = 0;
 
 	for (; i < nb_pkts; i++) {
@@ -1361,8 +1370,7 @@ dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unus
 
 		//rte_pktmbuf_dump(stdout, m, m->pkt_len);
 
-		if (((m->packet_type & (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4)) != (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4)) ||
-			((m->packet_type & (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4)) != (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV6)) ) {
+		if (!(m->packet_type & ptype_ipmask)) {
 			uint16_t fwdport = dpdk_config.portmap[port][1];
 			if (rte_eth_tx_burst(fwdport, 0, &m, 1) != 1) {
 				/* todo: update counters */
@@ -1389,11 +1397,15 @@ dpdk_sw_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		struct rte_mbuf *m = pkts[i];
 		struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 
-		if (unlikely((eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) || 
+		if (unlikely((eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) && 
 			(eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6)))) {
+				/* todo: update counters */
 			rte_pktmbuf_free(m);
 			continue;
-		} 
+		}
+
+		m->packet_type = (eth_hdr->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) ?
+			RTE_PTYPE_L3_IPV4 : RTE_PTYPE_L3_IPV6;
 
 		pkts[j++] = pkts[i];
 	}
@@ -1412,7 +1424,7 @@ dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		struct rte_mbuf *m = pkts[i];
 		struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
 
-		if (unlikely((eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) || 
+		if (unlikely((eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) && 
 			(eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6)))) {
 			uint16_t fwdport = dpdk_config.portmap[port][1];
 			if (rte_eth_tx_burst(fwdport, 0, &m, 1) != 1) {
@@ -1420,7 +1432,10 @@ dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 				rte_pktmbuf_free(m);
 			}
 			continue;
-		} 
+		}
+
+		m->packet_type = (eth_hdr->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) ?
+			RTE_PTYPE_L3_IPV4 : RTE_PTYPE_L3_IPV6;
 
 		pkts[j++] = pkts[i];
 	}
