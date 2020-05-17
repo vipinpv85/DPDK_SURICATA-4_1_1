@@ -38,8 +38,6 @@
 #include "tm-queuehandlers.h"
 #include "tm-threads.h"
 #include "tm-threads-common.h"
-#include "runmode-tile.h"
-#include "source-mpipe.h"
 #include "conf.h"
 #include "util-debug.h"
 #include "util-error.h"
@@ -259,6 +257,12 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 	//SCLogNotice("RX-TX Intf Id in %d out %d\n", ptv->portQueuePair[0] & 0xffff, (ptv->portQueuePair[0] >> 32)&0xffff);
 	SCLogDebug("RX-TX Intf Id in %d out %d\n", ptv->portid, ptv->fwd_portid);
 
+	struct rte_mbuf *bufs[16];
+	const uint16_t nb_rx = rte_eth_rx_burst(ptv->portid, ptv->queueid, bufs, 16);
+
+	if (likely(nb_rx))
+		rte_pktmbuf_free_bulk(bufs, nb_rx);
+
 #if 0
 	TmSlot *s = (TmSlot *)slot;
 	//ptv->slot = s->slot_next;
@@ -408,18 +412,11 @@ TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 TmEcode ReceiveDpdkDeinit(ThreadVars *tv, void *data)
 {
 	SCEnter();
+	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
+
+	SCLogNotice("todo: wait for DPDK threads using rte_eal_wait, stop port-queue ");
 
 	rte_free(data);
-
-#if 0
-    if (strcmp(link_name, "multi") == 0) {
-        int nlive = LiveGetDeviceCount();
-    } else {
-        SCLogInfo("using single interface %s", (char *)initdata);
-    }
-#endif
-
-	SCLogNotice(" wait for DPDK threads using rte_eal_wait ");
 	SCReturnInt(TM_ECODE_OK);
 }
 

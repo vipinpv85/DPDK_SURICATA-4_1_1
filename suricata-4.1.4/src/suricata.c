@@ -183,6 +183,11 @@
 #include "source-dpdk.h"
 
 extern uint16_t argument_count;
+
+#ifndef SUIRCATA_DPDK_MAXARGS
+#define SUIRCATA_DPDK_MAXARGS 32
+#endif
+
 extern char argument[SUIRCATA_DPDK_MAXARGS][32];
 
 char *args[SUIRCATA_DPDK_MAXARGS];
@@ -971,7 +976,7 @@ static TmEcode ParseInterfacesList(const int runmode, char *pcap_dev)
     SCEnter();
 
     /* run the selected runmode */
-    if (runmode == RUNMODE_PCAP_DEV) {
+   if (runmode == RUNMODE_PCAP_DEV) {
         if (strlen(pcap_dev) == 0) {
             int ret = LiveBuildDeviceList("pcap");
             if (ret == 0) {

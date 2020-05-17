@@ -1069,6 +1069,11 @@ static int RunModeDpdkWorkers(void)
 			//rte_eth_link_get_nowait(portMap[portIndex].inport, &linkSpeed);
 			rte_eth_link_get(i, &linkSpeed);
 		} while ((!linkSpeed.link_status) && (--max_retry > 0));
+
+		if (!linkSpeed.link_status) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " link stateis down for port %d\n", i);
+			exit(EXIT_FAILURE);
+		}
 		SCLogNotice(" port (%d) link is up!", i);
 	}
 

@@ -1487,7 +1487,7 @@ spm-algo: auto
 
 # Suricata is multi-threaded. Here the threading can be influenced.
 threading:
-  set-cpu-affinity: no
+  set-cpu-affinity: yes
   # Tune cpu affinity of threads. Each family of threads can be bound
   # on specific CPUs.
   #
@@ -1501,11 +1501,11 @@ threading:
   #
   cpu-affinity:
     - management-cpu-set:
-        cpu: [ 0 ]  # include only these CPUs in affinity settings
+        cpu: [ 1 ]  # include only these CPUs in affinity settings
     - receive-cpu-set:
-        cpu: [ 0 ]  # include only these CPUs in affinity settings
+        cpu: [ "2-15" ]  # include only these CPUs in affinity settings
     - worker-cpu-set:
-        cpu: [ "all" ]
+        cpu: [ "2-15" ]
         mode: "exclusive"
         # Use explicitely 3 threads and don't compute number by using
         # detect-thread-ratio variable:
@@ -1513,8 +1513,8 @@ threading:
         prio:
           low: [ 0 ]
           medium: [ "1-2" ]
-          high: [ 3 ]
-          default: "medium"
+          high: [ "2-15" ]
+          default: "high"
     #- verdict-cpu-set:
     #    cpu: [ 0 ]
     #    prio:
@@ -1822,9 +1822,9 @@ dpdk:
   tx-fragment: no
   rx-reassemble: no
   # BYPASS, IDS, IPS, HYBRID (new mode)
-  mode: IDS
+  mode: IPS
   # DPDK port index
-  input-output-map: ["0-0", "1-1"]
+  input-output-map: ["0-1", "1-0", "2-3", "3-2"]
 
 # Tilera mpipe configuration. for use on Tilera TILE-Gx.
 mpipe:
