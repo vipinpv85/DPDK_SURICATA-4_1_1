@@ -85,23 +85,14 @@ typedef struct __attribute__((__packed__))
 
 const char *RunModeDpdkGetDefaultMode(void);
 void RunModeDpdkRegister(void);
-int RunModeDpdkWorkers(void);
 uint16_t GetDpdkPort(void);
 void ListDpdkPorts(void);
 void *ParseDpdkConfig(const char *file);
 int ParseDpdkYaml(void);
 int CreateDpdkAcl(void);
-int32_t addDpdkAcl4Rule(uint32_t srcIp, uint32_t srcIpMask, uint32_t dstIp, uint32_t dstIpMask, uint8_t proto);
-int32_t addDpdkAcl6Rule(uint32_t srcIp[4], uint32_t srcIpMask[4], uint32_t dstIp[4], uint32_t dstIpMask[4], uint8_t proto);
-int32_t addDpdkAcl4Build(void);
-int32_t addDpdkAcl6Build(void);
 int CreateDpdkReassemblyFragement(void);
 int ValidateDpdkConfig(void);
-int SetupDdpdkPorts(void);
-void DumpGlobalConfig(void);
-void ListDpdkConfig(void);
 int CreateDpdkRing(void);
 uint8_t GetRunMode(void);
-int DpdkGetRxThreads(void);
 
 #endif  /* __RUNMODE_DPDK_H__ */

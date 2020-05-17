@@ -269,6 +269,13 @@ RTE_ACL_RULE_DEF(acl6_rule, RTE_DIM(ip6_defs));
 
 #define SUIRCATA_DPDK_MAXARGS 32
 
+static int RunModeDpdkWorkers(void);
+static int SetupDdpdkPorts(void);
+static void DumpGlobalConfig(void);
+static void ListDpdkConfig(void);
+static int DpdkGetRxThreads(void);
+static int DpdkGetThreadsCount(void *conf);
+
 static DpdkMempool_t dpdk_mempool_config;
 static DpdkAclConfig_t dpdk_acl_config;
 static DpdkConfig_t dpdk_config;
@@ -286,6 +293,16 @@ uint16_t argument_count = 1;
 char argument[SUIRCATA_DPDK_MAXARGS][32] = {{"./dpdk-suricata"}, {""}};
 
 static uint16_t
+dpdk_mbuf_ptype_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
+
+static uint16_t
+dpdk_sw_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
+
+static uint16_t
 dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		struct rte_mbuf **pkts, uint16_t nb_pkts,
 		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
@@ -294,6 +311,7 @@ static uint16_t
 dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		struct rte_mbuf **pkts, uint16_t nb_pkts,
 		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
+
 
 #endif
 
@@ -372,7 +390,7 @@ int CreateDpdkRing(void)
 #endif
 }
 
-int SetupDdpdkPorts(void)
+static int SetupDdpdkPorts(void)
 {
 	SCEnter();
 
@@ -512,8 +530,10 @@ int SetupDdpdkPorts(void)
 		}
 
 		for (int q = 0; q < dpdk_ports[i].rxq_count; q++) {
-			if (rte_eth_add_rx_callback(i, q, (hw_filter) ?
-				dpdk_mbuf_ptype_fiter_nonip: dpdk_sw_fiter_nonip, NULL) == NULL) {
+			if (rte_eth_add_rx_callback(i, q, 
+				(dpdk_config.mode == 1) ? ((hw_filter) ? dpdk_mbuf_ptype_fiter_nonip_ids : dpdk_sw_fiter_nonip_ids) :
+				(hw_filter) ? dpdk_mbuf_ptype_fiter_nonip : dpdk_sw_fiter_nonip,
+				NULL) == NULL) {
 				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to configure callback on port (%d)!", i);
 				return -EINVAL;
 			}
@@ -943,15 +963,14 @@ static void *DpdkConfigParser(const char *device)
 #ifndef HAVE_DPDK
 	SCLogInfo("\n ERROR: DPDK not supported!");
 #else
-	int ret = -1;
+	int ret;
 	static uint16_t port = 0;
 	static uint16_t queue = 0;
 
 	struct rte_eth_dev_info dev_info;
 
-	char tname[50] = {""};
-	ThreadVars *tv_worker = NULL;
-	TmModule *tm_module = NULL;
+	//ThreadVars *tv_worker = NULL;
+	//TmModule *tm_module = NULL;
 
 	DpdkIfaceConfig_t *config = rte_zmalloc(NULL, sizeof(DpdkIfaceConfig_t), 0);
 	if (config == NULL) {
@@ -1014,7 +1033,7 @@ static void *DpdkConfigParser(const char *device)
 	SCReturnPtr(NULL, "void *");
 }
 
-int RunModeDpdkWorkers(void)
+static int RunModeDpdkWorkers(void)
 {
 	SCEnter();
 
@@ -1032,6 +1051,26 @@ int RunModeDpdkWorkers(void)
 
 	/* dump dpdk application configuration */
 	DumpGlobalConfig();
+
+	uint16_t ports =  rte_eth_dev_count_avail();
+		int max_retry = 10;
+		struct rte_eth_link linkSpeed;
+	for (int i = 0; i < ports; i++) {
+		/* let's start the device */
+		if (rte_eth_dev_start(i) < 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " failed to start port %d\n", i);
+			exit(EXIT_FAILURE);
+		}
+		SCLogNotice(" port (%d) is started!", i);
+
+		/* let us check the link state */
+		do {
+			rte_delay_us(1000);
+			//rte_eth_link_get_nowait(portMap[portIndex].inport, &linkSpeed);
+			rte_eth_link_get(i, &linkSpeed);
+		} while ((!linkSpeed.link_status) && (--max_retry > 0));
+		SCLogNotice(" port (%d) link is up!", i);
+	}
 
 	for (int i = 0; i < rx_threads; i++) {
 		snprintf(tname, sizeof(tname), "%s%d", "DPDKRX-THREAD-", i);
@@ -1132,7 +1171,7 @@ uint8_t GetRunMode(void)
 #endif
 }
 
-int DpdkGetRxThreads(void)
+static int DpdkGetRxThreads(void)
 {
 	SCEnter();
 	int ret = 0;
@@ -1150,7 +1189,10 @@ int DpdkGetRxThreads(void)
 			SCLogNotice(" port (%u) queues (%u)", i, dev_info.nb_rx_queues);
 			ret += dev_info.nb_rx_queues;
 		}
+
+
 	}
+
 	SCLogNotice(" cores required from RX-Q is (%d)", ret);
 	/* get RX queues per port */
 	
@@ -1175,7 +1217,7 @@ uint16_t GetDpdkPort(void)
 	SCReturnInt(ret);
 }
 
-void ListDpdkConfig(void)
+static void ListDpdkConfig(void)
 {
 #ifndef HAVE_DPDK
 	SCLogInfo("\n ERROR: DPDK not supported!");
@@ -1259,7 +1301,7 @@ void ListDpdkPorts(void)
 	return;
 }
 
-void DumpGlobalConfig(void)
+static void DumpGlobalConfig(void)
 {
 	SCEnter();
 #ifndef HAVE_DPDK
@@ -1279,7 +1321,7 @@ void DumpGlobalConfig(void)
 
 #ifdef HAVE_DPDK
 static uint16_t
-dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+dpdk_mbuf_ptype_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		struct rte_mbuf **pkts, uint16_t nb_pkts,
 		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
 {
@@ -1303,7 +1345,36 @@ dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unus
 }
 
 static uint16_t
-dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
+{
+	int i = 0, j = 0;
+
+	for (; i < nb_pkts; i++) {
+		struct rte_mbuf *m = pkts[i];
+
+		//rte_pktmbuf_dump(stdout, m, m->pkt_len);
+
+		if (((m->packet_type & (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4)) != (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4)) ||
+			((m->packet_type & (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4)) != (RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV6)) ) {
+			uint16_t fwdport = dpdk_config.portmap[port][1];
+			if (rte_eth_tx_burst(fwdport, 0, &m, 1) != 1) {
+				/* todo: update counters */
+				rte_pktmbuf_free(m);
+			}
+			continue;
+		}
+
+			pkts[j++] = pkts[i];
+	}
+
+	return j;
+}
+
+
+static uint16_t
+dpdk_sw_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		struct rte_mbuf **pkts, uint16_t nb_pkts,
 		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
 {
@@ -1316,6 +1387,33 @@ dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		if (unlikely((eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) || 
 			(eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6)))) {
 			rte_pktmbuf_free(m);
+			continue;
+		} 
+
+		pkts[j++] = pkts[i];
+	}
+
+	return j;
+}
+
+static uint16_t
+dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
+{
+	int i = 0, j = 0;
+	for (; i < nb_pkts; i++) {
+		/* condition check */
+		struct rte_mbuf *m = pkts[i];
+		struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+
+		if (unlikely((eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) || 
+			(eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6)))) {
+			uint16_t fwdport = dpdk_config.portmap[port][1];
+			if (rte_eth_tx_burst(fwdport, 0, &m, 1) != 1) {
+				/* todo: update counters */
+				rte_pktmbuf_free(m);
+			}
 			continue;
 		} 
 

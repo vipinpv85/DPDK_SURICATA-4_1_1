@@ -198,6 +198,7 @@ void TmModuleDecodeDpdkRegister (void)
 	SCReturn;
 }
 
+#if DPDK_FUTURE
 /* Release Packet without sending. */
 void DpdkReleasePacket(Packet *p)
 {
@@ -238,6 +239,7 @@ static void SendNoOpPacket(ThreadVars *tv, TmSlot *slot)
 
     TmThreadsSlotProcessPkt(tv, slot, p);
 }
+#endif
 
 TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 {
@@ -247,14 +249,8 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 
 #if HAVE_DPDK
 	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
-	TmSlot *s = (TmSlot *)slot;
-	//ptv->slot = s->slot_next;
-	Packet *p = NULL;
-	int rank = tv->rank;
-	int max_queued = 0;
-	char *ctype;
 
-	SCLogDebug(" running %s on %d core %d\n", __func__, pthread_self(), sched_getcpu());
+	SCLogDebug(" running on %d core %d\n", (int)pthread_self(), sched_getcpu());
 
 	if (unlikely(ptv == NULL)) {
 		SCReturnInt(TM_ECODE_FAILED);
@@ -264,6 +260,12 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 	SCLogDebug("RX-TX Intf Id in %d out %d\n", ptv->portid, ptv->fwd_portid);
 
 #if 0
+	TmSlot *s = (TmSlot *)slot;
+	//ptv->slot = s->slot_next;
+	Packet *p = NULL;
+	int rank = tv->rank;
+	int max_queued = 0;
+	char *ctype;
     ptv->checksum_mode = CHECKSUM_VALIDATION_DISABLE;
     if (ConfGet("mpipe.checksum-checks", &ctype) == 1) {
         if (ConfValIsTrue(ctype)) {
@@ -462,7 +464,6 @@ TmEcode DecodeDpdk(ThreadVars *tv, Packet *p, void *data, PacketQueue *pq,
     SCEnter();
     DecodeThreadVars *dtv = (DecodeThreadVars *)data;
 
-#if HAVE_DPDK
     /* XXX HACK: flow timeout can call us for injected pseudo packets
      *           see bug: https://redmine.openinfosecfoundation.org/issues/1107 */
     if (p->flags & PKT_PSEUDO_STREAM_END)
@@ -479,8 +480,10 @@ TmEcode DecodeDpdk(ThreadVars *tv, Packet *p, void *data, PacketQueue *pq,
     SCReturnInt(TM_ECODE_OK);
 }
 
+#if DPDK_FUTURE
 int DpdkLiveRegisterDevice(char *dev)
 {
+#if HAVE_DPDK
     DpdkDevice *nd = SCMalloc(sizeof(DpdkDevice));
     if (unlikely(nd == NULL)) {
         return -1;
@@ -497,5 +500,6 @@ int DpdkLiveRegisterDevice(char *dev)
     SCLogDebug("DPDK device \"%s\" registered.", dev);
     return 0;
 }
+#endif
 
 #endif // HAVE_DPDK
