@@ -91,6 +91,11 @@ Introduction:
 What mode to use: (to be decided - which one to support and start)
 
 1. Primary (singleton/monolithic):
+```
+
+<img src="images/monolithic.png" width=auto>
+
+```
 Pros:
 a) Suricata will run as Primary managing all DPDK PMD and Libraries.
 b) Requires access to hugepages and root permission.
@@ -103,6 +108,11 @@ b) code becomes bulky.
 c) HW vendor or device offload, code needs to updated with generic API or SW fallback.
 
 2. Seocndary:
+```
+
+<img src="images/co-operative.png" width=auto>
+
+```
 Pros:
 a) Suricata will run as Secondary with zero or a little managment and setup code for PMD and Libraries.
 b) Requires access to hugepages and root permission.
@@ -115,6 +125,11 @@ b) cannot make use of DPDK secondary apps like proc-info, pdump, any other custo
 c) Need to probe the configuration settings for HW vendor or device offload.
 
 3. Detached Primary:
+```
+
+<img src="images/detached.png" width=auto>
+
+```
 Pros:
 a) Suricata will run as Primary, getting packets from another DPDK primary via memif/vhost/AF_XDP interface.
 b) Requires access to huge pages and root permission.
