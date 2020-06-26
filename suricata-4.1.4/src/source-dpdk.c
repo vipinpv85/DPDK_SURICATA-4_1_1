@@ -414,8 +414,6 @@ TmEcode ReceiveDpdkDeinit(ThreadVars *tv, void *data)
 	SCEnter();
 	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
 
-	SCLogNotice("todo: wait for DPDK threads using rte_eal_wait, stop port-queue ");
-
 	rte_free(data);
 	SCReturnInt(TM_ECODE_OK);
 }

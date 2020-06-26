@@ -182,8 +182,12 @@
 #ifdef HAVE_DPDK
 #include "source-dpdk.h"
 
+#ifndef SUIRCATA_DPDK_MAXARGS
+#define SUIRCATA_DPDK_MAXARGS 32
+#endif
+
 extern uint16_t argument_count;
-extern char dpdkArgument[SUIRCATA_DPDK_MAXARGS][32];
+extern char dpdkArgument[SUIRCATA_DPDK_MAXARGS][128];
 
 char *args[SUIRCATA_DPDK_MAXARGS];
 #endif
@@ -3068,6 +3072,7 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
+#if 0
         SCLogDebug(" Check for ACL offlaod for DPDK RX-TX.");
         if (CreateDpdkAcl()) {
             SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ACL DPDK!");
@@ -3079,6 +3084,7 @@ int main(int argc, char **argv)
             SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ReassemblyFragement DPDK!");
             exit(EXIT_FAILURE);
         }
+#endif
     }
 #endif
 

@@ -312,8 +312,6 @@ dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		struct rte_mbuf **pkts, uint16_t nb_pkts,
 		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
 
-
->>>>>>> ed3edd3fecbbdb91beb6c6abdb21a2e8b8d98971
 #endif
 
 /*

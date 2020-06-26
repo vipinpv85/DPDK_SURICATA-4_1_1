@@ -1364,8 +1364,8 @@
 -lrte_pci -Wl,-lrte_eal -Wl,-lrte_cmdline -Wl,-lrte_reorder -Wl,-lrte_sched -Wl,-lrte_rcu -Wl,\
 -lrte_bus_pci -Wl,-lrte_bus_vdev -Wl,\
 -lrte_mempool_bucket -Wl,-lrte_mempool_stack -Wl,-lrte_pmd_af_packet -Wl,\
--lrte_pmd_i40e -Wl,-lrte_pmd_memif -Wl,-lrte_pmd_null -Wl,-lrte_pmd_pcap -Wl,\
--lpcap -Wl,-lrte_pmd_ring -Wl,-lrte_pmd_tap -Wl,-lrte_pmd_virtio -Wl,-lrte_bus_vmbus -Wl,-lrte_pmd_openssl -Wl,-lcrypto -Wl,\
+-lrte_pmd_i40e -Wl,-lrte_pmd_memif -Wl,-lrte_pmd_null -Wl,\
+-lpcap -Wl,-lrte_pmd_ring -Wl,-lrte_pmd_tap -Wl,-lrte_pmd_virtio -Wl,-lrte_bus_vmbus -Wl,-lcrypto -Wl,\
 -lrte_pmd_null_crypto -Wl,-lrte_pmd_crypto_scheduler -Wl,-lrte_pmd_virtio_crypto -Wl,-lrte_pmd_skeleton_event -Wl,\
 -lrte_pmd_sw_event -Wl,--no-whole-archive -Wl,-lrt -Wl,-lm -Wl,-lnuma -Wl,-ldl -Wl,-export-dynamic -Wl,\
 -export-dynamic -L$RTE_SDK/examples/l2fwd/build/lib -L$RTE_SDK/$RTE_TARGET/lib -Wl,--as-needed"
