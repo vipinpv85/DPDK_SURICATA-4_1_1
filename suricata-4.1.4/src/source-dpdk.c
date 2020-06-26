@@ -38,8 +38,6 @@
 #include "tm-queuehandlers.h"
 #include "tm-threads.h"
 #include "tm-threads-common.h"
-#include "runmode-tile.h"
-#include "source-mpipe.h"
 #include "conf.h"
 #include "util-debug.h"
 #include "util-error.h"
@@ -198,6 +196,7 @@ void TmModuleDecodeDpdkRegister (void)
 	SCReturn;
 }
 
+#if DPDK_FUTURE
 /* Release Packet without sending. */
 void DpdkReleasePacket(Packet *p)
 {
@@ -238,6 +237,7 @@ static void SendNoOpPacket(ThreadVars *tv, TmSlot *slot)
 
     TmThreadsSlotProcessPkt(tv, slot, p);
 }
+#endif
 
 TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 {
@@ -247,14 +247,8 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 
 #if HAVE_DPDK
 	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
-	TmSlot *s = (TmSlot *)slot;
-	//ptv->slot = s->slot_next;
-	Packet *p = NULL;
-	int rank = tv->rank;
-	int max_queued = 0;
-	char *ctype;
 
-	SCLogDebug(" running %s on %d core %d\n", __func__, pthread_self(), sched_getcpu());
+	SCLogDebug(" running on %d core %d\n", (int)pthread_self(), sched_getcpu());
 
 	if (unlikely(ptv == NULL)) {
 		SCReturnInt(TM_ECODE_FAILED);
@@ -263,7 +257,19 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 	//SCLogNotice("RX-TX Intf Id in %d out %d\n", ptv->portQueuePair[0] & 0xffff, (ptv->portQueuePair[0] >> 32)&0xffff);
 	SCLogDebug("RX-TX Intf Id in %d out %d\n", ptv->portid, ptv->fwd_portid);
 
+	struct rte_mbuf *bufs[16];
+	const uint16_t nb_rx = rte_eth_rx_burst(ptv->portid, ptv->queueid, bufs, 16);
+
+	if (likely(nb_rx))
+		rte_pktmbuf_free_bulk(bufs, nb_rx);
+
 #if 0
+	TmSlot *s = (TmSlot *)slot;
+	//ptv->slot = s->slot_next;
+	Packet *p = NULL;
+	int rank = tv->rank;
+	int max_queued = 0;
+	char *ctype;
     ptv->checksum_mode = CHECKSUM_VALIDATION_DISABLE;
     if (ConfGet("mpipe.checksum-checks", &ctype) == 1) {
         if (ConfValIsTrue(ctype)) {
@@ -406,17 +412,11 @@ TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 TmEcode ReceiveDpdkDeinit(ThreadVars *tv, void *data)
 {
 	SCEnter();
+	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
+
+	SCLogNotice("todo: wait for DPDK threads using rte_eal_wait, stop port-queue ");
 
 	rte_free(data);
-
-#if 0
-    if (strcmp(link_name, "multi") == 0) {
-        int nlive = LiveGetDeviceCount();
-    } else {
-        SCLogInfo("using single interface %s", (char *)initdata);
-    }
-#endif
-
 	SCReturnInt(TM_ECODE_OK);
 }
 
@@ -461,7 +461,6 @@ TmEcode DecodeDpdk(ThreadVars *tv, Packet *p, void *data, PacketQueue *pq,
     SCEnter();
     DecodeThreadVars *dtv = (DecodeThreadVars *)data;
 
-#if HAVE_DPDK
     /* XXX HACK: flow timeout can call us for injected pseudo packets
      *           see bug: https://redmine.openinfosecfoundation.org/issues/1107 */
     if (p->flags & PKT_PSEUDO_STREAM_END)
@@ -478,8 +477,10 @@ TmEcode DecodeDpdk(ThreadVars *tv, Packet *p, void *data, PacketQueue *pq,
     SCReturnInt(TM_ECODE_OK);
 }
 
+#if DPDK_FUTURE
 int DpdkLiveRegisterDevice(char *dev)
 {
+#if HAVE_DPDK
     DpdkDevice *nd = SCMalloc(sizeof(DpdkDevice));
     if (unlikely(nd == NULL)) {
         return -1;
@@ -496,5 +497,6 @@ int DpdkLiveRegisterDevice(char *dev)
     SCLogDebug("DPDK device \"%s\" registered.", dev);
     return 0;
 }
+#endif
 
 #endif // HAVE_DPDK

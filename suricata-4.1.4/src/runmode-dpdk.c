@@ -27,7 +27,43 @@
  *
  * DPDK runmode support
  */
-#include "dpdk-include-common.h"
+
+//#include "dpdk-include-common.h"
+
+#ifdef HAVE_DPDK
+#include <rte_common.h>
+#include <rte_byteorder.h>
+#include <rte_log.h>
+#include <rte_memory.h>
+#include <rte_memcpy.h>
+#include <rte_memzone.h>
+#include <rte_eal.h>
+#include <rte_per_lcore.h>
+#include <rte_launch.h>
+#include <rte_atomic.h>
+#include <rte_cycles.h>
+#include <rte_prefetch.h>
+#include <rte_lcore.h>
+#include <rte_per_lcore.h>
+#include <rte_branch_prediction.h>
+#include <rte_interrupts.h>
+#include <rte_pci.h>
+#include <rte_random.h>
+#include <rte_debug.h>
+#include <rte_mempool.h>
+#include <rte_mbuf.h>
+#include <rte_ether.h>
+#include <rte_ethdev.h>
+#include <rte_ip.h>
+#include <rte_tcp.h>
+#include <rte_udp.h>
+#include <rte_string_fns.h>
+#include <rte_acl.h>
+#include <rte_version.h>
+#include <rte_tailq.h>
+#include <rte_cfgfile.h>
+#endif
+
 #include "source-dpdk.h"
 
 #include "suricata-common.h"
@@ -47,9 +83,201 @@
 #include "util-runmodes.h"
 
 #ifdef HAVE_DPDK
-#define SUIRCATA_DPDK_MAXARGS 16
+
+enum {
+    PROTO_FIELD_IPV4,
+    SRC_FIELD_IPV4,
+    DST_FIELD_IPV4,
+#if DPDK_FUTURE
+    SRCP_FIELD_IPV4,
+    DSTP_FIELD_IPV4,
+#endif
+    NUM_FIELDS_IPV4
+};
+
+/*
+ * That effectively defines order of IPV4 classifications:
+ *  - PROTO
+ *  - SRC IP ADDRESS
+ *  - DST IP ADDRESS
+ *  - PORTS (SRC and DST)
+ */
+enum {
+    RTE_ACL_IPV4_PROTO,
+    RTE_ACL_IPV4_SRC,
+    RTE_ACL_IPV4_DST,
+    RTE_ACL_IPV4_PORTS,
+    RTE_ACL_IPV4_NUM
+};
+/*
+ --- ipv4 ---
+        src ip 3
+        dst ip 7
+        sport 11
+        dport 13
+ --- ipv6 ---
+         src ip 2
+         dst ip 18
+         sport ip 34
+         dport ip 36
+ */
+
+static struct rte_acl_field_def ip4_defs[NUM_FIELDS_IPV4] = {
+    [0] = {
+    .type = RTE_ACL_FIELD_TYPE_BITMASK,
+    .size = sizeof(uint8_t),
+    .field_index = PROTO_FIELD_IPV4,
+    .input_index = RTE_ACL_IPV4_PROTO,
+    .offset = 0,
+    },
+    [1] = {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = sizeof(uint32_t),
+    .field_index = SRC_FIELD_IPV4,
+    .input_index = RTE_ACL_IPV4_SRC,
+    //.offset = offsetof(struct ipv4_hdr, src_addr) - offsetof(struct ipv4_hdr, next_proto_id),
+    .offset = 3,
+    },
+    [2] = {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = sizeof(uint32_t),
+    .field_index = DST_FIELD_IPV4,
+    .input_index = RTE_ACL_IPV4_DST,
+    //.offset = offsetof(struct ipv4_hdr, dst_addr) - offsetof(struct ipv4_hdr, next_proto_id),
+    .offset = 8,
+    },
+#if DPDK_FUTURE
+    [3] = {
+    .type = RTE_ACL_FIELD_TYPE_RANGE,
+    .size = sizeof(uint16_t),
+    .field_index = SRCP_FIELD_IPV4,
+    .input_index = RTE_ACL_IPV4_PORTS,
+    .offset = 12,
+    },
+    [4] ={
+    .type = RTE_ACL_FIELD_TYPE_RANGE,
+    .size = sizeof(uint16_t),
+    .field_index = DSTP_FIELD_IPV4,
+    .input_index = RTE_ACL_IPV4_PORTS,
+    .offset =  14,
+    },
+#endif
+};
+
+enum {
+    IP6_PROTO,
+    IP6_SRC0,
+    IP6_SRC1,
+    IP6_SRC2,
+    IP6_SRC3,
+    IP6_DST0,
+    IP6_DST1,
+    IP6_DST2,
+    IP6_DST3,
+#if DPDK_FUTURE
+    IP6_SRCP,
+    IP6_DSTP,
+#endif
+    IP6_NUM
+};
+
+#define IP6_ADDR_SIZE 16
+static struct rte_acl_field_def ip6_defs[IP6_NUM] = {
+    {
+    .type = RTE_ACL_FIELD_TYPE_BITMASK,
+    .size = sizeof(uint8_t),
+    .field_index = IP6_PROTO,
+    .input_index = IP6_PROTO,
+    .offset = 0,
+    },
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = 4,
+    .field_index = IP6_SRC0,
+    .input_index = IP6_SRC0,
+    .offset = 2,
+    },
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = 4,
+    .field_index = IP6_SRC1,
+    .input_index = IP6_SRC1,
+    .offset = 6,
+    },
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = 4,
+    .field_index = IP6_SRC2,
+    .input_index = IP6_SRC2,
+    .offset = 10,
+    },
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = 4,
+    .field_index = IP6_SRC3,
+    .input_index = IP6_SRC3,
+    .offset = 14,
+    },
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = 4,
+    .field_index = IP6_DST0,
+    .input_index = IP6_DST0,
+    .offset = 18,
+    },
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = 4,
+    .field_index = IP6_DST1,
+    .input_index = IP6_DST1,
+    .offset = 22,
+    },
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = 4,
+    .field_index = IP6_DST2,
+    .input_index = IP6_DST2,
+    .offset = 26,
+    },
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE/*RTE_ACL_FIELD_TYPE_MASK*/,
+    .size = 4,
+    .field_index = IP6_DST3,
+    .input_index = IP6_DST3,
+    .offset = 30,
+    },
+#if DPDK_FUTURE
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE,
+    .size = sizeof(uint16_t),
+    .field_index = IP6_SRCP,
+    .input_index = IP6_SRCP,
+    .offset = 34,
+    },
+    {
+    .type = RTE_ACL_FIELD_TYPE_RANGE,
+    .size = sizeof(uint16_t),
+    .field_index = IP6_DSTP,
+    .input_index = IP6_SRCP,
+    .offset = 36,
+    }
+#endif
+};
+
+RTE_ACL_RULE_DEF(acl4_rule, RTE_DIM(ip4_defs));
+RTE_ACL_RULE_DEF(acl6_rule, RTE_DIM(ip6_defs));
+
+#define SUIRCATA_DPDK_MAXARGS 32
+
+static int RunModeDpdkWorkers(void);
+static int SetupDdpdkPorts(void);
+static void DumpGlobalConfig(void);
+static void ListDpdkConfig(void);
+static int DpdkGetRxThreads(void);
+static int DpdkGetThreadsCount(void *conf);
 
 static DpdkMempool_t dpdk_mempool_config;
+static DpdkAclConfig_t dpdk_acl_config;
 static DpdkConfig_t dpdk_config;
 static DpdkPortConfig_t dpdk_ports[RTE_MAX_ETHPORTS];
 
@@ -57,8 +285,35 @@ static DpdkPortConfig_t dpdk_ports[RTE_MAX_ETHPORTS];
 static int dpdk_num_pipelines;
 
 static uint16_t inout_map_count = 0;
+
+static struct acl4_rule testv4;
+static struct acl6_rule testv6;
+
 uint16_t argument_count = 1;
 char dpdkArgument[SUIRCATA_DPDK_MAXARGS][128] = {{"./dpdk-suricata"}, {""}};
+
+static uint16_t
+dpdk_mbuf_ptype_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
+
+static uint16_t
+dpdk_sw_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
+
+static uint16_t
+dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
+
+static uint16_t
+dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
+
+
+>>>>>>> ed3edd3fecbbdb91beb6c6abdb21a2e8b8d98971
 #endif
 
 /*
@@ -136,7 +391,7 @@ int CreateDpdkRing(void)
 #endif
 }
 
-int SetupDdpdkPorts(void)
+static int SetupDdpdkPorts(void)
 {
 	SCEnter();
 
@@ -168,9 +423,12 @@ int SetupDdpdkPorts(void)
 	if (rte_mempool_lookup(dpdk_mempool_config.name) == NULL) {
 		dpdk_mempool_config.mbuf_ptr = rte_pktmbuf_pool_create(
 				dpdk_mempool_config.name, dpdk_mempool_config.n,
-				/* MEMPOOL_CACHE_SIZE*/ 256, dpdk_mempool_config.private_data_size,
-				RTE_MBUF_DEFAULT_BUF_SIZE, dpdk_mempool_config.socket_id);
+				/* MEMPOOL_CACHE_SIZE*/ 256,
+				(dpdk_mempool_config.private_data_size == 0)? sizeof(Packet):dpdk_mempool_config.private_data_size,
+				RTE_MBUF_DEFAULT_BUF_SIZE,
+				dpdk_mempool_config.socket_id);
 	}
+
 	if (dpdk_mempool_config.mbuf_ptr == NULL) {
 		SCLogError(SC_ERR_DPDK_CONFIG, "Failed to create mbuf pool, (%s)!\n", rte_strerror(rte_errno));
 		return -EINVAL;
@@ -226,6 +484,7 @@ int SetupDdpdkPorts(void)
 				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] rx_queue: %d.", i, dpdk_ports[i].rxq_count);
 				return -EINVAL;
 			}
+
 			dpdk_num_pipelines += 1;
 		}
 
@@ -249,7 +508,47 @@ int SetupDdpdkPorts(void)
 		}
 
 		rte_eth_promiscuous_enable(i);
-	}
+
+		/* add call back to filter non-ip packets */
+		uint32_t ptypes[16];
+		uint32_t toset_ptypes[16];
+		int index = 0;
+		uint32_t ptype_mask = RTE_PTYPE_L2_ETHER | RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6;
+
+		int hw_filter = 0;
+		int num_ptypes = rte_eth_dev_get_supported_ptypes(i, ptype_mask, ptypes, RTE_DIM(ptypes));
+		if (num_ptypes > 0) {
+			for (int j =0; (j < num_ptypes) && (hw_filter != 3); j++) {
+				if (ptypes[j] & RTE_PTYPE_L3_IPV4) {
+					hw_filter |= 1;
+					toset_ptypes[index++] = ptypes[j];
+				}
+				if (ptypes[j] & RTE_PTYPE_L3_IPV6)
+					hw_filter |= 2;
+					toset_ptypes[index++] = ptypes[j];
+				}
+			}
+
+			if (hw_filter == 3) {
+					printf(" ptype filter for v4 and v6 \n");
+				if (rte_eth_dev_set_ptypes(i, ptype_mask, &toset_ptypes[j], index) != 0) {
+					hw_filter = 0;
+				}
+			}
+
+			for (int q = 0; q < dpdk_ports[i].rxq_count; q++) {
+				if (rte_eth_add_rx_callback(i, q,
+					(dpdk_config.mode == 1) ?
+						((hw_filter) ? dpdk_mbuf_ptype_fiter_nonip_ids : dpdk_sw_fiter_nonip_ids) :
+						((hw_filter) ? dpdk_mbuf_ptype_fiter_nonip : dpdk_sw_fiter_nonip),
+					NULL) == NULL) {
+					SCLogError(SC_ERR_DPDK_CONFIG, "Failed to configure callback on port (%d)!", i);
+					return -EINVAL;
+				}
+			}
+
+			/* add call back to pre-filter ACL */
+		}
 
 #if 0
 		/* check if enough lcore are present to run the logic */
@@ -385,8 +684,38 @@ int CreateDpdkAcl(void)
 #ifndef HAVE_DPDK
 	SCLogInfo(" not configured for DPDK");
 #else
-	if (dpdk_config.pre_acl)
+	if (dpdk_config.pre_acl) {
 		SCLogDebug(" PRE-ACL to create!");
+
+		struct rte_acl_param acl_param;
+		struct rte_acl_ctx *ctx;
+
+		acl_param.socket_id = 0;
+		acl_param.max_rule_num = dpdk_acl_config.acl4_rules;
+
+		/* setup acl - IPv4 */
+		acl_param.rule_size = RTE_ACL_RULE_SZ(RTE_DIM(ip4_defs));
+		acl_param.name = "suricata-ipv4";
+		ctx = rte_acl_create(&acl_param);
+		if ((ctx == NULL) || (rte_acl_set_ctx_classify(ctx, RTE_ACL_CLASSIFY_SSE))) {
+			SCLogError(SC_ERR_MISSING_CONFIG_PARAM, "acl ipv4 fail!!!");
+			exit(EXIT_FAILURE);
+		}
+		SCLogNotice("DPDK ipv4AclCtx: %p done!", ctx);
+		dpdk_acl_config.ipv4AclCtx = (void *)ctx;
+
+		/* setup acl - IPv6 */
+		acl_param.max_rule_num = dpdk_acl_config.acl6_rules;
+		acl_param.rule_size = RTE_ACL_RULE_SZ(RTE_DIM(ip6_defs));
+		acl_param.name = "suricata-ipv6";
+		ctx = rte_acl_create(&acl_param);
+		if ((ctx == NULL) || (rte_acl_set_ctx_classify(ctx, RTE_ACL_CLASSIFY_SSE))){
+		SCLogError(SC_ERR_MISSING_CONFIG_PARAM, "acl ipv6 fail!!!");
+		exit(EXIT_FAILURE);
+		}
+		SCLogNotice("DPDK ipv6AclCtx: %p done!", ctx);
+		dpdk_acl_config.ipv6AclCtx = (void *)ctx;
+	}
 	else
 		SCLogDebug(" PRE-ACL need not to create!");
 
@@ -568,8 +897,9 @@ static int DpdkGetThreadsCount(void *conf __attribute__((unused)))
 
 #ifdef HAVE_DPDK
 	ret = rte_lcore_count();
-#endif
+#else
 	SCLogInfo("\n ERROR: DPDK not supported!");
+#endif
 
 	SCReturnInt(ret);
 }
@@ -581,15 +911,14 @@ static void *DpdkConfigParser(const char *device)
 #ifndef HAVE_DPDK
 	SCLogInfo("\n ERROR: DPDK not supported!");
 #else
-	int ret = -1;
+	int ret;
 	static uint16_t port = 0;
 	static uint16_t queue = 0;
 
 	struct rte_eth_dev_info dev_info;
 
-	char tname[50] = {""};
-	ThreadVars *tv_worker = NULL;
-	TmModule *tm_module = NULL;
+	//ThreadVars *tv_worker = NULL;
+	//TmModule *tm_module = NULL;
 
 	DpdkIfaceConfig_t *config = rte_zmalloc(NULL, sizeof(DpdkIfaceConfig_t), 0);
 	if (config == NULL) {
@@ -652,7 +981,7 @@ static void *DpdkConfigParser(const char *device)
 	SCReturnPtr(NULL, "void *");
 }
 
-int RunModeDpdkWorkers(void)
+static int RunModeDpdkWorkers(void)
 {
 	SCEnter();
 
@@ -670,6 +999,31 @@ int RunModeDpdkWorkers(void)
 
 	/* dump dpdk application configuration */
 	DumpGlobalConfig();
+
+	uint16_t ports =  rte_eth_dev_count_avail();
+		int max_retry = 10;
+		struct rte_eth_link linkSpeed;
+	for (int i = 0; i < ports; i++) {
+		/* let's start the device */
+		if (rte_eth_dev_start(i) < 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " failed to start port %d\n", i);
+			exit(EXIT_FAILURE);
+		}
+		SCLogNotice(" port (%d) is started!", i);
+
+		/* let us check the link state */
+		do {
+			rte_delay_us(1000);
+			//rte_eth_link_get_nowait(portMap[portIndex].inport, &linkSpeed);
+			rte_eth_link_get(i, &linkSpeed);
+		} while ((!linkSpeed.link_status) && (--max_retry > 0));
+
+		if (!linkSpeed.link_status) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " link stateis down for port %d\n", i);
+			exit(EXIT_FAILURE);
+		}
+		SCLogNotice(" port (%d) link is up!", i);
+	}
 
 	for (int i = 0; i < rx_threads; i++) {
 		snprintf(tname, sizeof(tname), "%s%d", "DPDKRX-THREAD-", i);
@@ -770,7 +1124,7 @@ uint8_t GetRunMode(void)
 #endif
 }
 
-int DpdkGetRxThreads(void)
+static int DpdkGetRxThreads(void)
 {
 	SCEnter();
 	int ret = 0;
@@ -785,7 +1139,10 @@ int DpdkGetRxThreads(void)
 			SCLogNotice(" port (%u) queues (%u)", i, dev_info.nb_rx_queues);
 			ret += dev_info.nb_rx_queues;
 		}
+
+
 	}
+
 	SCLogNotice(" cores required from RX-Q is (%d)", ret);
 #else
 	SCLogInfo("\n ERROR: DPDK not supported!");
@@ -808,7 +1165,7 @@ uint16_t GetDpdkPort(void)
 	SCReturnInt(ret);
 }
 
-void ListDpdkConfig(void)
+static void ListDpdkConfig(void)
 {
 #ifndef HAVE_DPDK
 	SCLogInfo("\n ERROR: DPDK not supported!");
@@ -892,7 +1249,7 @@ void ListDpdkPorts(void)
 	return;
 }
 
-void DumpGlobalConfig(void)
+static void DumpGlobalConfig(void)
 {
 	SCEnter();
 #ifndef HAVE_DPDK
@@ -910,3 +1267,114 @@ void DumpGlobalConfig(void)
 	return;
 }
 
+#ifdef HAVE_DPDK
+static uint16_t
+dpdk_mbuf_ptype_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
+{
+	int i = 0, j = 0;
+	uint32_t ptype_ipmask = RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6;
+
+	for (; i < nb_pkts; i++) {
+		struct rte_mbuf *m = pkts[i];
+
+		//rte_pktmbuf_dump(stdout, m, m->pkt_len);
+
+		if (!(m->packet_type & ptype_ipmask)) {
+			rte_pktmbuf_free(m);
+			continue;
+		}
+
+			pkts[j++] = pkts[i];
+	}
+
+	return j;
+}
+
+static uint16_t
+dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
+{
+	uint32_t ptype_ipmask = RTE_PTYPE_L3_IPV4 | RTE_PTYPE_L3_IPV6;
+	int i = 0, j = 0;
+
+	for (; i < nb_pkts; i++) {
+		struct rte_mbuf *m = pkts[i];
+
+		//rte_pktmbuf_dump(stdout, m, m->pkt_len);
+
+		if (!(m->packet_type & ptype_ipmask)) {
+			uint16_t fwdport = dpdk_config.portmap[port][1];
+			if (rte_eth_tx_burst(fwdport, 0, &m, 1) != 1) {
+				/* todo: update counters */
+				rte_pktmbuf_free(m);
+			}
+			continue;
+		}
+
+			pkts[j++] = pkts[i];
+	}
+
+	return j;
+}
+
+
+static uint16_t
+dpdk_sw_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
+{
+	int i = 0, j = 0;
+	for (; i < nb_pkts; i++) {
+		/* condition check */
+		struct rte_mbuf *m = pkts[i];
+		struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+
+		if (unlikely((eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) && 
+			(eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6)))) {
+				/* todo: update counters */
+			rte_pktmbuf_free(m);
+			continue;
+		}
+
+		m->packet_type = (eth_hdr->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) ?
+			RTE_PTYPE_L3_IPV4 : RTE_PTYPE_L3_IPV6;
+
+		pkts[j++] = pkts[i];
+	}
+
+	return j;
+}
+
+static uint16_t
+dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
+{
+	int i = 0, j = 0;
+	for (; i < nb_pkts; i++) {
+		/* condition check */
+		struct rte_mbuf *m = pkts[i];
+		struct rte_ether_hdr *eth_hdr = rte_pktmbuf_mtod(m, struct rte_ether_hdr *);
+
+		if (unlikely((eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) && 
+			(eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6)))) {
+			uint16_t fwdport = dpdk_config.portmap[port][1];
+			if (rte_eth_tx_burst(fwdport, 0, &m, 1) != 1) {
+				/* todo: update counters */
+				rte_pktmbuf_free(m);
+			}
+			continue;
+		}
+
+		m->packet_type = (eth_hdr->ether_type == rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) ?
+			RTE_PTYPE_L3_IPV4 : RTE_PTYPE_L3_IPV6;
+
+		pkts[j++] = pkts[i];
+	}
+
+	return j;
+}
+#endif

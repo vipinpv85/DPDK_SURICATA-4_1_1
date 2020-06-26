@@ -49,6 +49,20 @@ typedef struct __attribute__((__packed__))
 	uint8_t jumbo:1;
 } DpdkPortConfig_t;
 
+typedef struct __attribute__((__packed__))
+{
+	uint32_t acl4_rules;
+	uint32_t acl6_rules;
+	uint32_t ipv4AclCount;
+	uint32_t ipv6AclCount;
+
+	void *ipv4AclCtx;
+	void *ipv6AclCtx;
+	void *ipv4AclRules;
+	void *ipv6AclRules;
+} DpdkAclConfig_t;
+
+
 #ifndef RTE_MAX_ETHPORTS
 #define RTE_MAX_ETHPORTS 1
 #endif
@@ -70,18 +84,13 @@ typedef struct __attribute__((__packed__))
 
 const char *RunModeDpdkGetDefaultMode(void);
 void RunModeDpdkRegister(void);
-int RunModeDpdkWorkers(void);
 uint16_t GetDpdkPort(void);
 void ListDpdkPorts(void);
 int ParseDpdkYaml(void);
 int CreateDpdkAcl(void);
 int CreateDpdkReassemblyFragement(void);
 int ValidateDpdkConfig(void);
-int SetupDdpdkPorts(void);
-void DumpGlobalConfig(void);
-void ListDpdkConfig(void);
 int CreateDpdkRing(void);
 uint8_t GetRunMode(void);
-int DpdkGetRxThreads(void);
 
 #endif  /* __RUNMODE_DPDK_H__ */

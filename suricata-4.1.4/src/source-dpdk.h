@@ -31,11 +31,17 @@
 #ifndef __SOURCE_DPDK_H__
 #define __SOURCE_DPDK_H__
 
+#ifdef _SYS_QUEUE_H_
+#undef _SYS_QUEUE_H_
+#include <sys/queue.h>
+#endif
+
 #include "rte_eal.h"
 #include "rte_launch.h"
 #include "rte_malloc.h"
+#include "rte_ethdev.h"
+#include "rte_mbuf.h"
 
-#define SUIRCATA_DPDK_MAXARGS 16
 #define DPDK_ETH_NAME_SIZE 48
 
 #define InitDpdkSuricata(a, b) rte_eal_init(a, (char **)b)
