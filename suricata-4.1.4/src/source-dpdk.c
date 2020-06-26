@@ -417,7 +417,6 @@ TmEcode ReceiveDpdkDeinit(ThreadVars *tv, void *data)
     }
 #endif
 
-	SCLogNotice(" wait for DPDK threads using rte_eal_wait ");
 	SCReturnInt(TM_ECODE_OK);
 }
 

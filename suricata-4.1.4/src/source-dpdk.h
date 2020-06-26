@@ -40,6 +40,7 @@
 
 #define InitDpdkSuricata(a, b) rte_eal_init(a, (char **)b)
 #define KillDpdkSuricata do {\
+	rte_eal_mp_wait_lcore();\
 	rte_eal_cleanup();\
 }while (0);
 

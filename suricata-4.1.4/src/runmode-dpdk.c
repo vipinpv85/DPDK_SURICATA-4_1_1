@@ -58,7 +58,7 @@ static int dpdk_num_pipelines;
 
 static uint16_t inout_map_count = 0;
 uint16_t argument_count = 1;
-char argument[SUIRCATA_DPDK_MAXARGS][32] = {{"./dpdk-suricata"}, {""}};
+char dpdkArgument[SUIRCATA_DPDK_MAXARGS][128] = {{"./dpdk-suricata"}, {""}};
 #endif
 
 /*
@@ -168,11 +168,11 @@ int SetupDdpdkPorts(void)
 	if (rte_mempool_lookup(dpdk_mempool_config.name) == NULL) {
 		dpdk_mempool_config.mbuf_ptr = rte_pktmbuf_pool_create(
 				dpdk_mempool_config.name, dpdk_mempool_config.n,
-				/* MEMPOOL_CACHE_SIZE*/ 256, (dpdk_mempool_config.private_data_size == 0)? sizeof(Packet):dpdk_mempool_config.private_data_size,
+				/* MEMPOOL_CACHE_SIZE*/ 256, dpdk_mempool_config.private_data_size,
 				RTE_MBUF_DEFAULT_BUF_SIZE, dpdk_mempool_config.socket_id);
 	}
 	if (dpdk_mempool_config.mbuf_ptr == NULL) {
-		SCLogError(SC_ERR_DPDK_CONFIG, "Failed to create mbuf pool!\n");
+		SCLogError(SC_ERR_DPDK_CONFIG, "Failed to create mbuf pool, (%s)!\n", rte_strerror(rte_errno));
 		return -EINVAL;
 	}
 	SCLogDebug(" mbuf pool (%p)!\n", rte_mempool_lookup(dpdk_mempool_config.name));
@@ -203,7 +203,6 @@ int SetupDdpdkPorts(void)
 		if (dpdk_ports[i].rxq_count == 1) {
 			local_port_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
 		} else {
-
 			local_port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
 			if (local_port_conf.rx_adv_conf.rss_conf.rss_hf != port_conf.rx_adv_conf.rss_conf.rss_hf) {
 				SCLogInfo(" Port %u modified RSS hash function based on hardware support,"
@@ -411,76 +410,146 @@ int ParseDpdkYaml(void)
 #else
 	SCLogDebug(" configured for Dpdk");
 
-	const char dpdk_components[10][40] = {
-			"pre-acl", "post-acl",
-			"rx-reassemble", "tx-fragment",
-			"mode", "input-output-map"
-			};
-	SCLogDebug(" elements in yaml for dpdk: %d", (int) RTE_DIM(dpdk_components));
-
+	char *value = NULL;
 	ConfNode *node = ConfGetNode("dpdk");
 	if (node == NULL) {
 		SCLogError(SC_ERR_DPDK_CONFIG, "Unable to find dpdk in yaml");
 		return -SC_ERR_DPDK_CONFIG;
 	}
 
+	dpdk_config.mode = 0xff;
+	dpdk_config.pre_acl = 0;
+	dpdk_config.post_acl = 0;
+	dpdk_config.rx_reassemble = 0;
+	dpdk_config.tx_fragment = 0;
+
+	int boolvalue = 0;
+
+	if (ConfGetChildValueBool(node, "pre-acl", &boolvalue) == 1)
+		dpdk_config.pre_acl = boolvalue;
+	if (ConfGetChildValueBool(node, "post-acl", &boolvalue) == 1)
+		dpdk_config.post_acl = boolvalue;
+	if (ConfGetChildValueBool(node, "rx-reassemble", &boolvalue) == 1)
+		dpdk_config.rx_reassemble = boolvalue;
+	if (ConfGetChildValueBool(node, "tx-fragment", &boolvalue) == 1)
+		dpdk_config.tx_fragment = boolvalue;
+	if (ConfGetChildValueInt(node, "ipv4-preacl", &boolvalue) == 1)
+		SCLogNotice(" ipv4-preacl %d", boolvalue);
+	if (ConfGetChildValueInt(node, "ipv6-preacl", &boolvalue) == 1)
+		SCLogNotice(" ipv6-preacl %d", boolvalue);
+
+	dpdk_config.mode = 1; /* default IDS */
+	char *mode = ConfNodeLookupChildValue(node, "mode");
+	if (mode)
+		dpdk_config.mode = (strcasecmp("IPS", mode) == 0) ? 2 :
+				 (strcasecmp("IDS", mode) == 0) ? 1 : 0/* BYPASS */;
+
+	ConfNode *Node = NULL;
 	ConfNode *sub_node = NULL;
 
-	TAILQ_FOREACH(sub_node, &node->head, next) {
-		SCLogDebug(" sub_node (%s) node (%s)", sub_node->name, node->name);
+	Node = ConfGetNode("dpdk.mempool-port-common");
+	if (Node) {
+		TAILQ_FOREACH(sub_node, &Node->head, next) {
+			if (sub_node->val) {
+				char *val_fld[2];
 
-		for (unsigned long int i = 0; i < RTE_DIM(dpdk_components); i++) {
-			if (strcasecmp(dpdk_components[i], sub_node->name) == 0) {
-				SCLogDebug(" sub_node (%s) val (%s)", sub_node->name, sub_node->val);
-
-				if (strcasecmp("pre-acl", sub_node->name) == 0) {
-					dpdk_config.pre_acl = (strcasecmp("yes", sub_node->val) ? 1 : 0);
-					continue;
-				} else if (strcasecmp("post-acl", sub_node->name) == 0) {
-					dpdk_config.post_acl = (strcasecmp("yes", sub_node->val) ? 1 : 0);
-					continue;
-				} else if (strcasecmp("rx-reassemble", sub_node->name) == 0) {
-					dpdk_config.rx_reassemble = (strcasecmp("yes", sub_node->val) ? 1 : 0);
-					continue;
-				} else if (strcasecmp("tx-fragment", sub_node->name) == 0) {
-					dpdk_config.tx_fragment = (strcasecmp("yes", sub_node->val) ? 1 : 0);
-					continue;
-				} else if (strcasecmp("mode", sub_node->name) == 0) {
-					dpdk_config.mode = (
-							(strcasecmp("IDS", sub_node->val) == 0)? 1 :
-							(strcasecmp("IPS", sub_node->val) == 0) ? 2 :
-							(strcasecmp("HYBRID", sub_node->val) == 0) ? 3 :
-							0 /* BYPASS */);
-					continue;
-				} else {
-					ConfNode *sub_node_val = NULL;
-					char *val_fld[2];
-
-						SCLogDebug(" sub_node (%s) ", sub_node->name);
-					if (strcasecmp("input-output-map", sub_node->name) == 0) {
-
-						TAILQ_FOREACH(sub_node_val, &sub_node->head, next) {
-							SCLogDebug(" sub_node (%s) val (%s)", sub_node->name, sub_node_val->val);
-							if (rte_strsplit(sub_node_val->val, sizeof(sub_node_val->val), val_fld, 2, '-') == 2) {
-								SCLogDebug(" portmap: in %s out %s", val_fld[0], val_fld[1]);
-
-								dpdk_config.portmap[inout_map_count][0] = atoi(val_fld[0]);
-								dpdk_config.portmap[inout_map_count][1] = atoi(val_fld[1]);
-
-								SCLogNotice(" in %u out %u ", dpdk_config.portmap[inout_map_count][0], dpdk_config.portmap[inout_map_count][1]);
-
-								inout_map_count += 1;
-							}
-						}
-
-						continue;
-					}
+				if (rte_strsplit(sub_node->val, sizeof(sub_node->val), val_fld, 2, '=') == 2) {
+					if (strncasecmp("name", val_fld[0], strlen("name")) == 0)
+						rte_memcpy(dpdk_mempool_config.name, val_fld[1], strlen(val_fld[1]));
+					else
+					if (strncasecmp("n", val_fld[0], strlen("n")) == 0)
+						dpdk_mempool_config.n = atoi(val_fld[1]);
+					else
+					if (strncasecmp("elt_size", val_fld[0], strlen("elt_size")) == 0)
+						dpdk_mempool_config.elt_size = atoi(val_fld[1]);
+					else
+					if (strncasecmp("private_data_size", val_fld[0], strlen("private_data_size")) == 0)
+						dpdk_mempool_config.private_data_size = atoi(val_fld[1]);
+					else
+					if (strncasecmp("socket_id", val_fld[0], strlen("socket_id")) == 0)
+						dpdk_mempool_config.private_data_size = atoi(val_fld[1]);
 				}
 			}
 		}
 	}
 
-	SCLogDebug(" dpdk_config: \n - pre_acl (%u)\n - post_acl (%u)\n - rx_reassemble (%d)\n - tx_fragment (%u)\n - mode (%u)",
+	for (int i = 0; i < RTE_MAX_ETHPORTS; i++) {
+		char portname[50];
+		snprintf(portname, 50, "dpdk.port-config-%d", i);
+
+		Node = ConfGetNode(portname);
+		if (Node) {
+			TAILQ_FOREACH(sub_node, &Node->head, next) {
+			if (sub_node->val) {
+				char *val_fld[2];
+
+				if (rte_strsplit(sub_node->val, sizeof(sub_node->val), val_fld, 2, '=') == 2) {
+					if (strcasecmp("queues", val_fld[0]) == 0) {
+							dpdk_ports[i].rxq_count = atoi(val_fld[1]);
+							dpdk_ports[i].txq_count = atoi(val_fld[1]) + 1;
+						}
+					} else
+					if (strcasecmp("mtu", val_fld[0]) == 0)
+							dpdk_ports[i].mtu = atoi(val_fld[1]);
+					else
+					if (strcasecmp("rss-tuple", val_fld[0]) == 0)
+							dpdk_ports[i].rss_tuple = atoi(val_fld[1]);
+					else
+					if (strcasecmp("jumbo", val_fld[0]) == 0)
+							dpdk_ports[i].jumbo = !strcasecmp(val_fld[1], "yes");
+				}
+			}
+		}
+	}
+
+	Node = ConfGetNode("dpdk.eal-args");
+	if (Node) {
+		TAILQ_FOREACH(sub_node, &Node->head, next) {
+			SCLogDebug(" sub_node (%s:%s) ", sub_node->name, sub_node->val);
+			if (sub_node->val)
+				snprintf(dpdkArgument[argument_count++], 128, "%s", sub_node->val);
+		}
+	}
+
+	Node = ConfGetNode("dpdk.mempool-reas-common");
+	if (Node) {
+		TAILQ_FOREACH(sub_node, &Node->head, next) {
+			char *val_fld[2];
+
+			if (rte_strsplit(sub_node->val, sizeof(sub_node->val), val_fld, 2, '=') == 2) {
+				SCLogNotice(" (%s:%s) ", val_fld[0], val_fld[1]);
+			}
+		}
+	}
+
+	Node = ConfGetNode("dpdk.input-output-map");
+	if (Node) {
+		if (dpdk_config.mode == 0xff) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " please select the dpdk.mode first!");
+			exit(EXIT_FAILURE);
+		}
+
+		TAILQ_FOREACH(sub_node, &Node->head, next) {
+			SCLogNotice(" sub_node (%s:%s) ", sub_node->name, sub_node->val);
+
+			if (dpdk_config.mode != 1 /* IPS/BYPASS */) {
+				char *val_fld[2];
+
+				if (rte_strsplit(sub_node->val, sizeof(sub_node->val), val_fld, 2, '-') == 2) {
+					dpdk_config.portmap[inout_map_count][0] = atoi(val_fld[0]);
+					dpdk_config.portmap[inout_map_count][1] = atoi(val_fld[1]);
+					inout_map_count += 1;
+				}
+			}
+			else {
+				dpdk_config.portmap[inout_map_count][0] = atoi(sub_node->val);
+				dpdk_config.portmap[inout_map_count][1] = atoi(sub_node->val);
+				inout_map_count += 1;
+			}
+		}
+	}
+
+	SCLogDebug(" config: \n - pre_acl (%u)\n - post_acl (%u)\n - rx_reassemble (%d)\n - tx_fragment (%u)\n - mode (%u)",
 			dpdk_config.pre_acl, dpdk_config.post_acl,
 			dpdk_config.rx_reassemble, dpdk_config.tx_fragment,
 			dpdk_config.mode);
@@ -490,106 +559,6 @@ int ParseDpdkYaml(void)
 #endif
 
 	SCReturnInt(ret);
-}
-
-void *ParseDpdkConfig(const char *dpdkCfg)
-{
-	SCEnter();
-	struct rte_cfgfile *file = NULL;
-
-#ifdef HAVE_DPDK
-	file = rte_cfgfile_load(dpdkCfg, 0);
-
-	/* get section name EAL */
-	if (rte_cfgfile_has_section(file, "EAL")) {
-		SCLogDebug(" section (EAL); count %d", rte_cfgfile_num_sections(file, "EAL", sizeof("EAL") - 1));
-		SCLogDebug(" section (EAL) has entries %d", rte_cfgfile_section_num_entries(file, "EAL"));
-
-		int n_entries = rte_cfgfile_section_num_entries(file, "EAL");
-		struct rte_cfgfile_entry entries[n_entries];
-
-		if (rte_cfgfile_section_entries(file, "EAL", entries, n_entries) != -1) {
-			argument_count += n_entries * 2;
-			SCLogDebug(" argument_count %d", argument_count);
-
-			for (int i = 0; i < n_entries; i++) {
-				SCLogDebug(" - entries[i].name: (%s) entries[i].value: (%s)", entries[i].name, entries[i].value);
-				snprintf(argument[i * 2 + 1], 32, "%s", entries[i].name);
-				snprintf(argument[i * 2 + 2], 32, "%s", entries[i].value);
-				SCLogDebug(" - argument: (%s) (%s)", argument[i * 2 + 1], argument[i * 2 + 2]);
-			}
-		}
-	}
-
-	/* get section name PORT-X */
-	for (int i = 0; i < RTE_MAX_ETHPORTS; i++) {
-		char port_section_name[15] = {""};
-
-		sprintf(port_section_name, "%s%d", "PORT-", i);
-		if (rte_cfgfile_has_section(file, port_section_name)) {
-			int n_port_entries = rte_cfgfile_section_num_entries(file, port_section_name);
-
-			SCLogDebug(" %s", port_section_name);
-			SCLogDebug(" section (PORT) has %d entries", n_port_entries);
-
-			struct rte_cfgfile_entry entries[n_port_entries];
-			if (rte_cfgfile_section_entries(file, port_section_name, entries, n_port_entries) != -1) {
-
-				for (int j = 0; j < n_port_entries; j++) {
-					SCLogDebug(" %s name: (%s) value: (%s)", port_section_name, entries[j].name, entries[j].value);
-
-					if (strcasecmp("rx-queues", entries[j].name) == 0)
-						dpdk_ports[i].rxq_count = atoi(entries[j].value);
-					else if (strcasecmp("tx-queues", entries[j].name) == 0)
-						dpdk_ports[i].txq_count = atoi(entries[j].value);
-					else if (strcasecmp("mtu", entries[j].name) == 0)
-						dpdk_ports[i].mtu = atoi(entries[j].value);
-					else if (strcasecmp("rss-tuple", entries[j].name) == 0)
-						dpdk_ports[i].rss_tuple = atoi(entries[j].value);
-					else if (strcasecmp("jumbo", entries[j].name) == 0)
-						dpdk_ports[i].jumbo = (strcasecmp(entries[j].value, "yes") == 0) ? 1 : 0;
-					else if (strcasecmp("core", entries[j].name) == 0) {
-						int lcoreindex = atoi(entries[j].value);
-						SCLogNotice(" - lcore index is %d, rte_lcore_count %d ", lcoreindex, rte_lcore_count());
-						dpdk_config.lcore_index_map[rte_lcore_count() % 64] |= 1 << lcoreindex;
-					}
-				}
-			}
-		}
-	}
-
-	/* get section name MEMPOOL-PORT */
-	if (rte_cfgfile_has_section(file, "MEMPOOL-PORT")) {
-		SCLogDebug(" section (MEMPOOL-PORT); count %d", rte_cfgfile_num_sections(file, "MEMPOOL-PORT", sizeof("MEMPOOL-PORT") - 1));
-		SCLogDebug(" section (MEMPOOL-PORT) has entries %d", rte_cfgfile_section_num_entries(file, "MEMPOOL-PORT"));
-
-		int n_entries = rte_cfgfile_section_num_entries(file, "MEMPOOL-PORT");
-		struct rte_cfgfile_entry entries[n_entries];
-
-		if (rte_cfgfile_section_entries(file, "MEMPOOL-PORT", entries, n_entries) != -1) {
-			for (int j = 0; j < n_entries; j++) {
-				SCLogDebug(" - entries[i] name: (%s) value: (%s)", entries[j].name, entries[j].value);
-
-				if (strcasecmp("name", entries[j].name) == 0)
-					rte_memcpy(dpdk_mempool_config.name, entries[j].value, sizeof(entries[j].value));
-				if (strcasecmp("n", entries[j].name) == 0)
-					dpdk_mempool_config.n = atoi(entries[j].value);
-				if (strcasecmp("elt_size", entries[j].name) == 0)
-					dpdk_mempool_config.elt_size = atoi(entries[j].value);
-				if (strcasecmp("private_data_size", entries[j].name) == 0)
-					dpdk_mempool_config.private_data_size = atoi(entries[j].value);
-				if (strcasecmp("socket_id", entries[j].name) == 0)
-					dpdk_mempool_config.private_data_size = atoi(entries[j].value);
-			}
-		}
-	}
-
-	rte_cfgfile_close(file);
-#else
-	SCLogInfo(" not configured for ParseDpdkConfig");
-#endif
-
-	SCReturnPtr(file, "void *");
 }
 
 static int DpdkGetThreadsCount(void *conf __attribute__((unused)))
@@ -807,10 +776,7 @@ int DpdkGetRxThreads(void)
 	int ret = 0;
 
 #ifdef HAVE_DPDK
-	for (int i = 0; i < (1 + (RTE_MAX_LCORE / 64)); i++)
-		ret += __builtin_popcountll(dpdk_config.lcore_index_map[i]);
-	SCLogNotice(" cores required from mysuricata.cfg is (%d)", ret);
-
+	/* get RX queues per port */
 	ret = 0;
 	uint16_t ports =  rte_eth_dev_count_avail();
 	for (int i = 0; i < ports; i++) {
@@ -821,8 +787,6 @@ int DpdkGetRxThreads(void)
 		}
 	}
 	SCLogNotice(" cores required from RX-Q is (%d)", ret);
-	/* get RX queues per port */
-	
 #else
 	SCLogInfo("\n ERROR: DPDK not supported!");
 #endif

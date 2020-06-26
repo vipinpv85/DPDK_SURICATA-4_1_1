@@ -183,7 +183,7 @@
 #include "source-dpdk.h"
 
 extern uint16_t argument_count;
-extern char argument[SUIRCATA_DPDK_MAXARGS][32];
+extern char dpdkArgument[SUIRCATA_DPDK_MAXARGS][32];
 
 char *args[SUIRCATA_DPDK_MAXARGS];
 #endif
@@ -983,7 +983,7 @@ static TmEcode ParseInterfacesList(const int runmode, char *pcap_dev)
     } else if (runmode == RUNMODE_DPDK) {
         /* init DPDK instance */
         for (int j = 0; j < argument_count; j++)
-           args[j] = argument[j];
+           args[j] = dpdkArgument[j];
 
         if (InitDpdkSuricata(argument_count, (char **)args)) {
             /* Identify the ports with DPDK */
@@ -1872,14 +1872,6 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
                     SCLogNotice(" DPDK Mode selected");
 
                     memset(suri->pcap_dev, 0, sizeof(suri->pcap_dev));
-
-                    SCLogDebug(" parse DPDK user config File (%s)", optarg);
-                    void *cfg_ptr = ParseDpdkConfig(optarg);
-                    if (cfg_ptr == NULL) {
-                        SCLogError(SC_ERR_DPDK_CONFIG,
-                               " File (%s) has config issue!", optarg);
-                        exit(EXIT_FAILURE);
-                    }
                 } else {
                     SCLogError(SC_ERR_MULTIPLE_RUN_MODE,
                                "more than one run mode has been specified");
@@ -2478,7 +2470,7 @@ static int StartInternalRunMode(SCInstance *suri, int argc, char **argv)
 #endif /* OS_WIN32 */
 #ifdef HAVE_DPDK
         case RUNMODE_DPDK_LISTPORTS:
-            args[0] = argument[0];
+            args[0] = dpdkArgument[0];
             if (InitDpdkSuricata(1, args) >= 0)
                 ListDpdkPorts();
             else
