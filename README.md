@@ -1,6 +1,6 @@
 # DPDK_SURICATA-4_1_1
 
-Planning to merge ACL from 3.0 with dpdk 19.11.
+porting ACL from 3.0 - work in progress
 
 ## Motivation
 
@@ -9,14 +9,16 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 <img src="images/arch.png" width=auto>
 
 # Things to do
-
  - [ ] implement SW or HW Symmetric Hashing for reassembled packets.
  - [ ] flatten the packet buffer for full zero-copy mode.
- - [ ] use SW or HW ACL for classification on directional rules from `https://github.com/vipinpv85/DPDK-Suricata_3.0`.
  - [ ] use zero copy for paylaod, PKT decode and other layers
- - [ ] cleanup logs and debug points
+ 
+# Work in progress
+ - [x] cleanup logs and debug points
+ - [x] use SW ACL for classification on directional rules from `https://github.com/vipinpv85/DPDK-Suricata_3.0`.
 
 # Things completed
+ - [x] move dpdk config to `suricata.yaml`
  - [x] allow multiple worker rather than single worker
  - [x] allow multiple RX queue with RSS (default)
  - [x] add dpdk fields to suricata.yaml
@@ -36,7 +38,7 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 
 ### Build and Run
 
-#### DPDK 18.11.3
+#### DPDK 19.11.3
 - Download DPDK from dpdk.org.
 - Untar DPDK tar file.
 - Execute the following commands
@@ -72,15 +74,12 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
  - Pin the memory to per NUMA by editing EAL args
  - Pin the worker threads by eiditing affinity in suricata.yaml
 
-```
-vim mysuricata.cfg
-under EAL append options '--socket-mem=1,1024' and '--scoket-limit=1,1024' for NUMA-1
-vim suricata.yaml
-under cpu-affinity update `worker-cpu-set` for desired NUMA-1 threads
-```
+1. edit suricata.yal. 
+2. Search for `dpdk`
+3. under EAL append options '--socket-mem=1,1024' and '--scoket-limit=1,1024' for NUMA-1
+4. under cpu-affinity update `worker-cpu-set` for desired NUMA-1 threads
 
 ## Work item in discussion with SURICATA team to merge
-
 ```
 Introduction:
 1. DPDK is set of Hardware and Software library, that helps to run on userspace.
