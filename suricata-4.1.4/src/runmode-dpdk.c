@@ -761,9 +761,9 @@ int ParseDpdkYaml(void)
 	if (ConfGetChildValueBool(node, "tx-fragment", &boolvalue) == 1)
 		dpdk_config.tx_fragment = boolvalue;
 	if (ConfGetChildValueInt(node, "ipv4-preacl", &boolvalue) == 1)
-		SCLogNotice(" ipv4-preacl %d", boolvalue);
+		dpdk_acl_config.acl4_rules = boolvalue;
 	if (ConfGetChildValueInt(node, "ipv6-preacl", &boolvalue) == 1)
-		SCLogNotice(" ipv6-preacl %d", boolvalue);
+		dpdk_acl_config.acl6_rules = boolvalue;
 
 	dpdk_config.mode = 1; /* default IDS */
 	char *mode = ConfNodeLookupChildValue(node, "mode");
@@ -1024,7 +1024,7 @@ static int RunModeDpdkWorkers(void)
 	}
 
 	for (int i = 0; i < rx_threads; i++) {
-		snprintf(tname, sizeof(tname), "%s%d", "DPDKRX-THREAD-", i);
+		snprintf(tname, sizeof(tname), "DPDKW-%03d", i);
 
 		tv_worker = TmThreadCreatePacketHandler(tname,
 				"packetpool", "packetpool",

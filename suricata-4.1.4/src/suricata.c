@@ -673,7 +673,7 @@ static void PrintUsage(const char *progname)
     printf("\t--mpipe                              : run with tilegx mpipe interface(s)\n");
 #endif
 #ifdef HAVE_DPDK
-    printf("\t--dpdk[=<file>]                      : run with DPDK mode with user config\n");
+    printf("\t--dpdk                      : run with DPDK mode with user config\n");
     printf("\t--list-dpdkports                     : list DPDK availble ports\n");
 #endif
 #ifdef WINDIVERT
@@ -986,8 +986,10 @@ static TmEcode ParseInterfacesList(const int runmode, char *pcap_dev)
 #ifdef HAVE_DPDK
     } else if (runmode == RUNMODE_DPDK) {
         /* init DPDK instance */
-        for (int j = 0; j < argument_count; j++)
+        for (int j = 0; j < argument_count; j++) {
+           SCLogDebug(" args-%3d: %s", j + 1, dpdkArgument[j]);
            args[j] = dpdkArgument[j];
+        }
 
         if (InitDpdkSuricata(argument_count, (char **)args)) {
             /* Identify the ports with DPDK */
@@ -1581,7 +1583,7 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
         {"mpipe", optional_argument, 0, 0},
 #endif
 #ifdef HAVE_DPDK
-        {"dpdk", required_argument, 0, 0},
+        {"dpdk", 0, 0, 0},
         {"list-dpdkports", 0, &list_dpdk_ports, 1},
 #endif
 #ifdef WINDIVERT
@@ -1883,7 +1885,7 @@ static TmEcode ParseCommandLine(int argc, char** argv, SCInstance *suri)
                     exit(EXIT_FAILURE);
                 }
 #else
-                SCLogError(SC_ERR_INITIALIZATION, "DPDK not enabled. Make sure to pass --enable-dpdk to configure when building.");
+                SCLogError(SC_ERR_INITIALIZATION, "DPDK not enabled. pass --enable-dpdk to configure");
                 return TM_ECODE_FAILED;
 #endif
             }
@@ -3066,25 +3068,10 @@ int main(int argc, char **argv)
 
 #ifdef HAVE_DPDK
     if (suricata.run_mode == RUNMODE_DPDK) {
-        SCLogDebug(" Read DPDK contents YAML file.");
         if (ParseDpdkYaml()) {
             SCLogError(SC_ERR_DPDK_CONFIG, " Failed to read content DPDK!");
             exit(EXIT_FAILURE);
         }
-
-#if 0
-        SCLogDebug(" Check for ACL offlaod for DPDK RX-TX.");
-        if (CreateDpdkAcl()) {
-            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ACL DPDK!");
-            exit(EXIT_FAILURE);
-        }
-
-        SCLogDebug(" Check for reassembly-fragemnt offlaod for DPDK.");
-        if (CreateDpdkReassemblyFragement()) {
-            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ReassemblyFragement DPDK!");
-            exit(EXIT_FAILURE);
-        }
-#endif
     }
 #endif
 
@@ -3102,6 +3089,22 @@ int main(int argc, char **argv)
     if (PostConfLoadedSetup(&suricata) != TM_ECODE_OK) {
         exit(EXIT_FAILURE);
     }
+
+#ifdef HAVE_DPDK
+    if (suricata.run_mode == RUNMODE_DPDK) {
+        SCLogDebug(" Check for ACL offlaod for DPDK RX-TX.");
+        if (CreateDpdkAcl()) {
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ACL DPDK!");
+            exit(EXIT_FAILURE);
+        }
+
+        SCLogDebug(" Check for reassembly-fragemnt offlaod for DPDK.");
+        if (CreateDpdkReassemblyFragement()) {
+            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create ReassemblyFragement DPDK!");
+            exit(EXIT_FAILURE);
+        }
+    }
+#endif
 
     SCDropMainThreadCaps(suricata.userid, suricata.groupid);
     PreRunPostPrivsDropInit(suricata.run_mode);
@@ -3129,7 +3132,7 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        SCLogDebug(" set run mode as IDS|IPS run mode %u is ips %u is ids %u ", GetRunMode(), EngineModeIsIPS(), EngineModeIsIDS());
+        SCLogDebug(" run mode %u is ips %u is ids %u ", GetRunMode(), EngineModeIsIPS(), EngineModeIsIDS());
         if (GetRunMode() == 1)
             EngineModeSetIDS();
         else if (GetRunMode() == 2)

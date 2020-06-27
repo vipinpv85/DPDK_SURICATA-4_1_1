@@ -1826,7 +1826,7 @@ dpdk:
   # port index
   input-output-map: ["0-1", "1-0", "2-3", "3-2"]
   # EAL args
-  eal-args: ["--log-level=eal,1", "-l 20", "--file-prefix suricata-dpdk", "-m 4096", "-w 0000:08:00.0", "-w 0000:08:00.1"]
+  eal-args: ["--log-level=eal,1", "--file-prefix suricata-dpdk", "-m 2048"]
   # mempool
   mempool-port-common: [name=suricata-port,n=16000,elt_size=2000,private_data_size=0]
   mempool-reas-common: [name=suricatareassembly,n=8000,elt_size=10000,private_data_size=0]
