@@ -274,7 +274,6 @@ static int SetupDdpdkPorts(void);
 static void DumpGlobalConfig(void);
 static void ListDpdkConfig(void);
 static int DpdkGetRxThreads(void);
-static int DpdkGetThreadsCount(void *conf);
 
 static DpdkMempool_t dpdk_mempool_config;
 static DpdkAclConfig_t dpdk_acl_config;
@@ -521,14 +520,15 @@ static int SetupDdpdkPorts(void)
 					hw_filter |= 1;
 					toset_ptypes[index++] = ptypes[j];
 				}
-				if (ptypes[j] & RTE_PTYPE_L3_IPV6)
+
+				if (ptypes[j] & RTE_PTYPE_L3_IPV6) {
 					hw_filter |= 2;
 					toset_ptypes[index++] = ptypes[j];
 				}
 			}
 
 			if (hw_filter == 3) {
-					printf(" ptype filter for v4 and v6 \n");
+				printf(" ptype filter for v4 and v6 \n");
 				if (rte_eth_dev_set_ptypes(i, ptype_mask, &toset_ptypes[j], index) != 0) {
 					hw_filter = 0;
 				}
@@ -547,14 +547,7 @@ static int SetupDdpdkPorts(void)
 
 			/* add call back to pre-filter ACL */
 		}
-
-#if 0
-		/* check if enough lcore are present to run the logic */
-		if ( >= rte_lcore_count()) {
-			SCLogError(SC_ERR_DPDK_CONFIG, "Expects (%d) lcores for (%d) port, availble lcores (%d)!", GetDpdkPort());
-			return -EINVAL;
-		}
-#endif
+	}
 
 #endif
 
@@ -737,20 +730,20 @@ int ParseDpdkYaml(void)
 #else
 	SCLogDebug(" configured for Dpdk");
 
-	char *value = NULL;
 	ConfNode *node = ConfGetNode("dpdk");
 	if (node == NULL) {
 		SCLogError(SC_ERR_DPDK_CONFIG, "Unable to find dpdk in yaml");
 		return -SC_ERR_DPDK_CONFIG;
 	}
 
-	dpdk_config.mode = 0xff;
+	dpdk_config.mode = ~0;
 	dpdk_config.pre_acl = 0;
 	dpdk_config.post_acl = 0;
 	dpdk_config.rx_reassemble = 0;
 	dpdk_config.tx_fragment = 0;
 
 	int boolvalue = 0;
+	intmax_t aclvalue = 0;
 
 	if (ConfGetChildValueBool(node, "pre-acl", &boolvalue) == 1)
 		dpdk_config.pre_acl = boolvalue;
@@ -760,13 +753,13 @@ int ParseDpdkYaml(void)
 		dpdk_config.rx_reassemble = boolvalue;
 	if (ConfGetChildValueBool(node, "tx-fragment", &boolvalue) == 1)
 		dpdk_config.tx_fragment = boolvalue;
-	if (ConfGetChildValueInt(node, "ipv4-preacl", &boolvalue) == 1)
-		dpdk_acl_config.acl4_rules = boolvalue;
-	if (ConfGetChildValueInt(node, "ipv6-preacl", &boolvalue) == 1)
-		dpdk_acl_config.acl6_rules = boolvalue;
+	if (ConfGetChildValueInt(node, "ipv4-preacl", &aclvalue) == 1)
+		dpdk_acl_config.acl4_rules = aclvalue;
+	if (ConfGetChildValueInt(node, "ipv6-preacl", &aclvalue) == 1)
+		dpdk_acl_config.acl6_rules = aclvalue;
 
 	dpdk_config.mode = 1; /* default IDS */
-	char *mode = ConfNodeLookupChildValue(node, "mode");
+	const char *mode = ConfNodeLookupChildValue(node, "mode");
 	if (mode)
 		dpdk_config.mode = (strcasecmp("IPS", mode) == 0) ? 2 :
 				 (strcasecmp("IDS", mode) == 0) ? 1 : 0/* BYPASS */;
@@ -888,20 +881,6 @@ int ParseDpdkYaml(void)
 	SCReturnInt(ret);
 }
 
-static int DpdkGetThreadsCount(void *conf __attribute__((unused)))
-{
-	SCEnter();
-	int ret = 0;
-
-#ifdef HAVE_DPDK
-	ret = rte_lcore_count();
-#else
-	SCLogInfo("\n ERROR: DPDK not supported!");
-#endif
-
-	SCReturnInt(ret);
-}
-
 static void *DpdkConfigParser(const char *device)
 {
 	SCEnter();
@@ -909,7 +888,6 @@ static void *DpdkConfigParser(const char *device)
 #ifndef HAVE_DPDK
 	SCLogInfo("\n ERROR: DPDK not supported!");
 #else
-	int ret;
 	static uint16_t port = 0;
 	static uint16_t queue = 0;
 
@@ -952,9 +930,16 @@ static void *DpdkConfigParser(const char *device)
 	//config->cluster_type = PACKET_FANOUT_CPU;
 
 	snprintf(config->in_iface, DPDK_ETH_NAME_SIZE, "unknown-in-%u", config->portid);
-	ret = rte_eth_dev_get_name_by_port(config->portid, config->in_iface);
+	if (rte_eth_dev_get_name_by_port(config->portid, config->in_iface) != 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " failed to get_name of port-%u\n", config->portid);
+			exit(EXIT_FAILURE);
+	}
+
 	snprintf(config->out_iface, DPDK_ETH_NAME_SIZE, "unknown-out-%u", config->fwd_portid);
-	ret = rte_eth_dev_get_name_by_port(config->fwd_portid, config->out_iface);
+	if (rte_eth_dev_get_name_by_port(config->fwd_portid, config->out_iface) != 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " failed to get_name of port-%u\n", config->fwd_portid);
+			exit(EXIT_FAILURE);
+	}
 
 	config->promiscous = 1;
 	config->checksumMode =
@@ -1096,21 +1081,6 @@ static int RunModeDpdkWorkers(void)
 #endif
 	SCReturnInt(ret);
 }
-
-#if DPDK-AF_WORKER
-	/* default run mode is worker */
-	ret = RunModeSetLiveCaptureWorkers(
-			DpdkConfigParser, DpdkGetThreadsCount,
-			(const char *) "ReceiveDpdk",
-			(const char *) "DecodeDpdk",
-			(const char *)"DecodeDpdk", NULL);
-
-	if (ret != 0) {
-		SCLogError(SC_ERR_RUNMODE, "DPDK workers runmode failed to start");
-		exit(EXIT_FAILURE);
-	}
-#endif
-
 
 uint8_t GetRunMode(void)
 {
