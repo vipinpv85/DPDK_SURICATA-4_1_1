@@ -75,6 +75,7 @@ typedef struct DpdkThreadVars_
 
 	Packet *in_p;
 
+	uint8_t mode;
 	uint16_t portid;
 	uint16_t queueid;
 	uint16_t fwd_portid;
@@ -260,18 +261,20 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 	struct rte_mbuf *bufs[16];
 	const uint16_t nb_rx = rte_eth_rx_burst(ptv->portid, ptv->queueid, bufs, 16);
 
-	if (likely(nb_rx)) {
-		const uint16_t nb_tx = rte_eth_tx_burst(ptv->fwd_portid, ptv->fwd_queueid, bufs, nb_rx);
-		/* Free any unsent packets. */
-		if (unlikely(nb_tx < nb_rx)) {
-			uint16_t buf;
-			//rte_pktmbuf_free_bulk(bufs, nb_rx);
-			for (buf = nb_tx; buf < nb_rx; buf++)
-				rte_pktmbuf_free(bufs[buf]);
+	if (likely(ptv->mode != 0)) {
+		if (likely(nb_rx)) {
+			const uint16_t nb_tx = rte_eth_tx_burst(ptv->fwd_portid, ptv->fwd_queueid, bufs, nb_rx);
+			/* Free any unsent packets. */
+			if (unlikely(nb_tx < nb_rx)) {
+				uint16_t buf;
+				//rte_pktmbuf_free_bulk(bufs, nb_rx);
+				for (buf = nb_tx; buf < nb_rx; buf++)
+					rte_pktmbuf_free(bufs[buf]);
+			}
 		}
+		else
+			usleep(1);
 	}
-	else
-		usleep(1);
 
 #if 0
 	TmSlot *s = (TmSlot *)slot;
@@ -402,6 +405,7 @@ TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 
 	DpdkIfaceConfig_t *dpdkconf = (DpdkIfaceConfig_t *) initdata;
 
+	ptv->mode = dpdkconf->mode;
 	ptv->portid = dpdkconf->portid;
 	ptv->fwd_portid = dpdkconf->fwd_portid;
 	ptv->queueid = dpdkconf->queueid;

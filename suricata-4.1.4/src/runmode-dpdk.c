@@ -311,6 +311,10 @@ dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		struct rte_mbuf **pkts, uint16_t nb_pkts,
 		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
 
+static uint16_t
+dpdk_mbuf_bypass(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused);
 #endif
 
 /*
@@ -505,6 +509,17 @@ static int SetupDdpdkPorts(void)
 		}
 
 		rte_eth_promiscuous_enable(i);
+
+		/* check if mode is bypassed, then invoke dpdk_mbuf_bypass */
+		if (dpdk_config.mode == 0) {
+			for (int q = 0; q < dpdk_ports[i].rxq_count; q++) {
+				if (rte_eth_add_rx_callback(i, q, dpdk_mbuf_bypass, NULL) == NULL) {
+					SCLogError(SC_ERR_DPDK_CONFIG, "Failed to configure callback on port (%d)!", i);
+					return -EINVAL;
+				}
+			}
+			continue;
+		}
 
 		/* add call back to filter non-ip packets */
 		uint32_t ptypes[16];
@@ -736,7 +751,7 @@ int ParseDpdkYaml(void)
 		return -SC_ERR_DPDK_CONFIG;
 	}
 
-	dpdk_config.mode = ~0;
+	dpdk_config.mode = dpdk_config.mode;
 	dpdk_config.pre_acl = 0;
 	dpdk_config.post_acl = 0;
 	dpdk_config.rx_reassemble = 0;
@@ -912,6 +927,7 @@ static void *DpdkConfigParser(const char *device)
 
 	SCLogNotice(" port %u, rx queues %u", port, dev_info.nb_rx_queues);
 
+	config->mode = dpdk_config.mode;
 	config->portid = port;
 	config->queueid = queue;
 	config->fwd_portid = dpdk_config.portmap[port][1];
@@ -1236,6 +1252,24 @@ static void DumpGlobalConfig(void)
 }
 
 #ifdef HAVE_DPDK
+static uint16_t
+dpdk_mbuf_bypass(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
+		struct rte_mbuf **pkts, uint16_t nb_pkts,
+		uint16_t max_pkts __rte_unused, void *_ __rte_unused)
+{
+	uint16_t fwdport = dpdk_config.portmap[port][1];
+
+	if (likely(nb_pkts)) {
+		uint16_t nb_tx = rte_eth_tx_burst(fwdport, qidx, pkts, nb_pkts);
+		if (nb_tx < nb_pkts) {
+			for (uint16_t buf = nb_tx; buf < nb_pkts; buf++)
+				rte_pktmbuf_free(pkts[buf]);
+		}
+	}
+
+	return 0;
+}
+
 static uint16_t
 dpdk_mbuf_ptype_fiter_nonip_ids(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		struct rte_mbuf **pkts, uint16_t nb_pkts,

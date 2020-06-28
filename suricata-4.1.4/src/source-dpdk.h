@@ -59,6 +59,7 @@ typedef struct DpdkIfaceConfig
 	char in_iface[DPDK_ETH_NAME_SIZE];
 	char out_iface[DPDK_ETH_NAME_SIZE];
 
+	uint8_t mode;
 	uint16_t portid;
 	uint16_t queueid;
 	uint16_t fwd_portid;
