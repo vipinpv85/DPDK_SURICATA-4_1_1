@@ -84,6 +84,21 @@
 
 #ifdef HAVE_DPDK
 
+struct rte_eth_conf port_conf = {
+	.rxmode = {
+		.mq_mode = ETH_MQ_RX_RSS,
+		.max_rx_pkt_len = RTE_ETHER_MAX_LEN,
+		.split_hdr_size = 0,
+		.offloads = DEV_RX_OFFLOAD_CHECKSUM,
+	},
+	.rx_adv_conf = {
+		.rss_conf = {
+			.rss_key = NULL,
+			.rss_hf = ETH_RSS_IP | ETH_RSS_TCP | ETH_RSS_UDP | ETH_RSS_SCTP,
+		},
+	},
+};
+
 enum {
     PROTO_FIELD_IPV4,
     SRC_FIELD_IPV4,
@@ -343,55 +358,6 @@ void RunModeDpdkRegister(void)
 	return;
 }
 
-int CreateDpdkRing(void)
-{
-	SCEnter();
-
-#ifndef HAVE_DPDK
-	SCLogInfo(" not configured for DPDK");
-	return -1;
-#else
-	int i, ring_index = 0;
-	char ring_name[25] = {""};
-
-	SCLogNotice(" Creating (%d) Rings!", dpdk_num_pipelines);
-
-	for (i = 0; i < dpdk_num_pipelines; i++)
-	{
-		sprintf(ring_name, "SCRING%d", i);
-		SCLogDebug(" ring create for %s", ring_name);
-
-		if (rte_ring_lookup(ring_name) == NULL) {
-			struct rte_ring *ptr = rte_ring_create(ring_name, 8192/*size*/, rte_socket_id(), RING_F_SP_ENQ|RING_F_SC_DEQ);
-			if (ptr == NULL) {
-				SCLogError(SC_ERR_DPDK_MEM, " failed to create (%s) RING!", ring_name);
-				return -1;
-			}
-		}
-	}
-	SCLogDebug(" RING setup done");
-
-	SCLogDebug(" Map port to ring");
-
-	RTE_ETH_FOREACH_DEV(i)
-	{
-		struct rte_eth_dev_info dev_info;
-
-		rte_eth_dev_info_get(i, &dev_info);
-
-		for (int j = 0; j < dev_info.nb_rx_queues; j++) 
-		{
-			sprintf(ring_name, "SCRING%d", ring_index++);
-			dpdk_config.port_ring[i][j] = rte_ring_lookup(ring_name);
-
-			SCLogDebug(" dpdk_config.port_ring for port %u queue %u is %p", i, j, dpdk_config.port_ring[i][j]);
-		}
-	}
-
-	return 0;
-#endif
-}
-
 static int SetupDdpdkPorts(void)
 {
 	SCEnter();
@@ -406,26 +372,13 @@ static int SetupDdpdkPorts(void)
 	uint16_t mtu = 0;
 	int i, j;
 
-	struct rte_eth_conf port_conf = {
-		.rxmode = {
-			.mq_mode = ETH_MQ_RX_RSS,
-			.max_rx_pkt_len = RTE_ETHER_MAX_LEN,
-			.split_hdr_size = 0,
-		},
-		.rx_adv_conf = {
-			.rss_conf = {
-				.rss_key = NULL,
-				.rss_hf = ETH_RSS_IP,
-			},
-		},
-	};
 
 	/* create mbuf_pool if not created */
 	if (rte_mempool_lookup(dpdk_mempool_config.name) == NULL) {
 		dpdk_mempool_config.mbuf_ptr = rte_pktmbuf_pool_create(
 				dpdk_mempool_config.name, dpdk_mempool_config.n,
 				/* MEMPOOL_CACHE_SIZE*/ 256,
-				(dpdk_mempool_config.private_data_size == 0)? sizeof(Packet):dpdk_mempool_config.private_data_size,
+				sizeof(Packet) /*dpdk_mempool_config.private_data_size*/,
 				RTE_MBUF_DEFAULT_BUF_SIZE,
 				dpdk_mempool_config.socket_id);
 	}
@@ -444,9 +397,8 @@ static int SetupDdpdkPorts(void)
 		uint64_t rx_offloads = local_port_conf.rxmode.offloads;
 
 		if (dpdk_ports[i].jumbo) {
-			rx_offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
+			local_port_conf.rxmode.offloads |= DEV_RX_OFFLOAD_JUMBO_FRAME;
 		}
-		local_port_conf.rxmode.offloads = rx_offloads;
 
 		rte_eth_dev_info_get(i, &dev_info);
 		if (rte_eth_dev_adjust_nb_rx_tx_desc(i, &nb_rxd, &nb_txd) < 0) {
@@ -462,6 +414,7 @@ static int SetupDdpdkPorts(void)
 		if (dpdk_ports[i].rxq_count == 1) {
 			local_port_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
 		} else {
+			SCLogNotice(" Port %u RX-q (%u) hence trying RSS", i, dpdk_ports[i].rxq_count);
 			local_port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
 			if (local_port_conf.rx_adv_conf.rss_conf.rss_hf != port_conf.rx_adv_conf.rss_conf.rss_hf) {
 				SCLogInfo(" Port %u modified RSS hash function based on hardware support,"
@@ -481,7 +434,14 @@ static int SetupDdpdkPorts(void)
 		}
 
 		for (j = 0; j < dpdk_ports[i].rxq_count; j++) {
-			if (rte_eth_rx_queue_setup(i, j, nb_rxd, rte_eth_dev_socket_id(i), NULL, dpdk_mempool_config.mbuf_ptr) < 0) {
+			struct rte_eth_rxconf rxq_conf;
+			struct rte_eth_dev_info dev_q_info;
+			rte_eth_dev_info_get(i, &dev_q_info);
+
+			rxq_conf = dev_q_info.default_rxconf;
+			rxq_conf.offloads = port_conf.rxmode.offloads;
+
+			if (rte_eth_rx_queue_setup(i, j, nb_rxd, rte_eth_dev_socket_id(i), &rxq_conf, dpdk_mempool_config.mbuf_ptr) < 0) {
 				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] rx_queue: %d.", i, dpdk_ports[i].rxq_count);
 				return -EINVAL;
 			}
@@ -490,7 +450,14 @@ static int SetupDdpdkPorts(void)
 		}
 
 		for (j = 0; j < dpdk_ports[i].txq_count; j++) {
-			if (rte_eth_tx_queue_setup(i, j, nb_txd, rte_eth_dev_socket_id(i), NULL) < 0) {
+			struct rte_eth_txconf txconf;
+			struct rte_eth_dev_info dev_q_info;
+			rte_eth_dev_info_get(i, &dev_q_info);
+
+			txconf = dev_q_info.default_txconf;
+			txconf.offloads = local_port_conf.txmode.offloads;
+
+			if (rte_eth_tx_queue_setup(i, j, nb_txd, rte_eth_dev_socket_id(i), &txconf) < 0) {
 				SCLogError(SC_ERR_DPDK_CONFIG, "Failed to setup port [%d] tx_queue: %d.", i, dpdk_ports[i].txq_count);
 				return -EINVAL;
 			}
@@ -543,7 +510,6 @@ static int SetupDdpdkPorts(void)
 			}
 
 			if (hw_filter == 3) {
-				printf(" ptype filter for v4 and v6 \n");
 				if (rte_eth_dev_set_ptypes(i, ptype_mask, &toset_ptypes[j], index) != 0) {
 					hw_filter = 0;
 				}
@@ -707,7 +673,7 @@ int CreateDpdkAcl(void)
 			SCLogError(SC_ERR_MISSING_CONFIG_PARAM, "acl ipv4 fail!!!");
 			exit(EXIT_FAILURE);
 		}
-		SCLogNotice("DPDK ipv4AclCtx: %p done!", ctx);
+		SCLogDebug("DPDK ipv4AclCtx: %p done!", ctx);
 		dpdk_acl_config.ipv4AclCtx = (void *)ctx;
 
 		/* setup acl - IPv6 */
@@ -719,7 +685,7 @@ int CreateDpdkAcl(void)
 		SCLogError(SC_ERR_MISSING_CONFIG_PARAM, "acl ipv6 fail!!!");
 		exit(EXIT_FAILURE);
 		}
-		SCLogNotice("DPDK ipv6AclCtx: %p done!", ctx);
+		SCLogDebug("DPDK ipv6AclCtx: %p done!", ctx);
 		dpdk_acl_config.ipv6AclCtx = (void *)ctx;
 	}
 	else
@@ -925,7 +891,7 @@ static void *DpdkConfigParser(const char *device)
 		SCReturnPtr(NULL, "void *");
 	}
 
-	SCLogNotice(" port %u, rx queues %u", port, dev_info.nb_rx_queues);
+	SCLogDebug(" port %u, rx queues %u", port, dev_info.nb_rx_queues);
 
 	config->mode = dpdk_config.mode;
 	config->portid = port;
@@ -933,7 +899,7 @@ static void *DpdkConfigParser(const char *device)
 	config->fwd_portid = dpdk_config.portmap[port][1];
 	config->fwd_queueid = queue;
 
-	SCLogNotice(" ----- port %u queue %u", port, queue);
+	SCLogDebug(" ----- port %u queue %u", port, queue);
 	if ((queue + 1) < dev_info.nb_rx_queues) {
 		queue += 1;
 	} else {
@@ -960,13 +926,13 @@ static void *DpdkConfigParser(const char *device)
 	config->promiscous = 1;
 	config->checksumMode =
 		(dev_info.default_rxconf.offloads & DEV_RX_OFFLOAD_CHECKSUM) ?
-		CHECKSUM_VALIDATION_RXONLY : CHECKSUM_VALIDATION_DISABLE;
+		CHECKSUM_VALIDATION_DISABLE : CHECKSUM_VALIDATION_RXONLY;
 	config->bpfFilter = NULL;
 
 	config->flags = 0; /* what should be flags here? */
 	config->copy_mode = 0; /* need to check from suricata IPS/IDS/BYPASS */
 
-	SCLogNotice(" in (%s, %u, %u) out (%s, %u, %u) checksum %x",
+	SCLogDebug(" in (%s, %u, %u) out (%s, %u, %u) checksum %x",
 		config->in_iface, config->portid, config->queueid,
 		config->out_iface, config->fwd_portid, config->fwd_queueid,
 		config->checksumMode);
@@ -1000,28 +966,27 @@ static int RunModeDpdkWorkers(void)
 	DumpGlobalConfig();
 
 	uint16_t ports =  rte_eth_dev_count_avail();
-		int max_retry = 10;
-		struct rte_eth_link linkSpeed;
+	int max_retry = 10;
+	struct rte_eth_link linkSpeed;
 	for (int i = 0; i < ports; i++) {
 		/* let's start the device */
 		if (rte_eth_dev_start(i) < 0) {
 			SCLogError(SC_ERR_DPDK_CONFIG, " failed to start port %d\n", i);
 			exit(EXIT_FAILURE);
 		}
-		SCLogNotice(" port (%d) is started!", i);
+		SCLogDebug(" port (%d) is started!", i);
 
 		/* let us check the link state */
 		do {
 			rte_delay_us(1000);
-			//rte_eth_link_get_nowait(portMap[portIndex].inport, &linkSpeed);
 			rte_eth_link_get(i, &linkSpeed);
 		} while ((!linkSpeed.link_status) && (--max_retry > 0));
 
 		if (!linkSpeed.link_status) {
-			SCLogError(SC_ERR_DPDK_CONFIG, " link stateis down for port %d\n", i);
+			SCLogError(SC_ERR_DPDK_CONFIG, " link state is down for port %d\n", i);
 			exit(EXIT_FAILURE);
 		}
-		SCLogNotice(" port (%d) link is up!", i);
+		SCLogDebug(" port (%d) link is up!", i);
 	}
 
 	for (int i = 0; i < rx_threads; i++) {
@@ -1057,9 +1022,10 @@ static int RunModeDpdkWorkers(void)
 		}
 
 		TmSlotSetFuncAppend(tv_worker, tm_module, (void *)recv_ptr);
+		TmThreadSetCPU(tv_worker, WORKER_CPU_SET);
 
 		/*
-		 * If pre=acl is configured, use decode thread to process the frames.
+		 * If pre-acl is configured, use decode thread to process the frames.
 		 */
 
 		tm_module = TmModuleGetByName("DecodeDPDK");
@@ -1083,14 +1049,12 @@ static int RunModeDpdkWorkers(void)
 		}
 		TmSlotSetFuncAppend(tv_worker, tm_module, NULL);
 
-		TmThreadSetCPU(tv_worker, WORKER_CPU_SET);
-
 		if (TmThreadSpawn(tv_worker) != TM_ECODE_OK) {
 			printf("ERROR: TmThreadSpawn failed\n");
 			exit(EXIT_FAILURE);
 		}
 
-		SCLogNotice(" ceated %s for count %d ", tname, i);
+		SCLogDebug(" ceated %s for count %d ", tname, i);
 	}
 
 	SCLogInfo("RunMode DPDK workers initialised");
@@ -1114,20 +1078,17 @@ static int DpdkGetRxThreads(void)
 	int ret = 0;
 
 #ifdef HAVE_DPDK
-	/* get RX queues per port */
 	ret = 0;
 	uint16_t ports =  rte_eth_dev_count_avail();
 	for (int i = 0; i < ports; i++) {
 		struct rte_eth_dev_info dev_info;
 		if (rte_eth_dev_info_get(i, &dev_info) == 0) {
-			SCLogNotice(" port (%u) queues (%u)", i, dev_info.nb_rx_queues);
+			SCLogDebug(" port (%u) queues (%u)", i, dev_info.nb_rx_queues);
 			ret += dev_info.nb_rx_queues;
 		}
-
-
 	}
 
-	SCLogNotice(" cores required from RX-Q is (%d)", ret);
+	SCLogDebug(" cores required from RX-Q is (%d)", ret);
 #else
 	SCLogInfo("\n ERROR: DPDK not supported!");
 #endif
@@ -1158,34 +1119,32 @@ static void ListDpdkConfig(void)
 
 	SCLogDebug(" DPDK supported!");
 
-	SCLogNotice(" -- MEMPOOL-PORT --");
-	SCLogNotice(" - name (%s)", dpdk_mempool_config.name);
-	SCLogNotice(" - number of elements (%u)", dpdk_mempool_config.n);
-	SCLogNotice(" - size of elements (%u)", dpdk_mempool_config.elt_size);
-	SCLogNotice(" - scoketid (%u)", dpdk_mempool_config.socket_id);
-	SCLogNotice(" - private data size (%u)", dpdk_mempool_config.private_data_size);
-	SCLogNotice(" - mbuf pool ptr (%p)", dpdk_mempool_config.mbuf_ptr);
-	SCLogNotice(" ");
+	SCLogDebug(" -- MEMPOOL-PORT --");
+	SCLogDebug(" - name (%s)", dpdk_mempool_config.name);
+	SCLogDebug(" - number of elements (%u)", dpdk_mempool_config.n);
+	SCLogDebug(" - size of elements (%u)", dpdk_mempool_config.elt_size);
+	SCLogDebug(" - scoketid (%u)", dpdk_mempool_config.socket_id);
+	SCLogDebug(" - private data size (%u)", dpdk_mempool_config.private_data_size);
+	SCLogDebug(" - mbuf pool ptr (%p)", dpdk_mempool_config.mbuf_ptr);
 
 	for (i = 0; i < nb_ports; i++)
 	{
-		SCLogNotice(" -- PORT-%u --", i);
-		SCLogNotice(" - rxq (%u)", dpdk_ports[i].rxq_count);
-		SCLogNotice(" - txq (%u)", dpdk_ports[i].txq_count);
-		SCLogNotice(" - mtu (%u)", dpdk_ports[i].mtu);
-		SCLogNotice(" - rss (%u)", dpdk_ports[i].rss_tuple);
-		SCLogNotice(" - jumbo (%u)", dpdk_ports[i].jumbo);
-		SCLogNotice(" ");
+		SCLogDebug(" -- PORT-%u --", i);
+		SCLogDebug(" - rxq (%u)", dpdk_ports[i].rxq_count);
+		SCLogDebug(" - txq (%u)", dpdk_ports[i].txq_count);
+		SCLogDebug(" - mtu (%u)", dpdk_ports[i].mtu);
+		SCLogDebug(" - rss (%u)", dpdk_ports[i].rss_tuple);
+		SCLogDebug(" - jumbo (%u)", dpdk_ports[i].jumbo);
+		SCLogDebug(" ");
 	}
 
-	SCLogNotice(" -- APP Config --");
-	SCLogNotice(" - pre_acl (%u)", dpdk_config.pre_acl);
-	SCLogNotice(" - post_acl (%u)", dpdk_config.post_acl);
-	SCLogNotice(" - rx_reassemble (%u)", dpdk_config.rx_reassemble);
-	SCLogNotice(" - tx_fragment (%u)", dpdk_config.tx_fragment);
-	SCLogNotice(" - mode (%u)", dpdk_config.mode);
-	SCLogNotice(" - Ring Created (%u)", dpdk_num_pipelines);
-	SCLogNotice(" ");
+	SCLogDebug(" -- APP Config --");
+	SCLogDebug(" - pre_acl (%u)", dpdk_config.pre_acl);
+	SCLogDebug(" - post_acl (%u)", dpdk_config.post_acl);
+	SCLogDebug(" - rx_reassemble (%u)", dpdk_config.rx_reassemble);
+	SCLogDebug(" - tx_fragment (%u)", dpdk_config.tx_fragment);
+	SCLogDebug(" - mode (%u)", dpdk_config.mode);
+	SCLogDebug(" - Ring Created (%u)", dpdk_num_pipelines);
 
 #endif
 }
@@ -1202,7 +1161,7 @@ void ListDpdkPorts(void)
 	if (RTE_PROC_INVALID != rte_eal_process_type()) {
 		nb_ports = rte_eth_dev_count_avail();
 
-		SCLogNotice("--- DPDK Ports ---");
+		SCLogDebug("--- DPDK Ports ---");
 		SCLogDebug("Overall Ports: %d ", nb_ports);
 
 		for (; i < nb_ports; i++) {
@@ -1210,23 +1169,22 @@ void ListDpdkPorts(void)
 			struct rte_eth_dev_info info;
 			struct rte_eth_link link;
 
-			SCLogNotice(" -- Port: %d", i);
+			SCLogDebug(" -- Port: %d", i);
 
 			rte_eth_dev_info_get(i, &info);
 			rte_eth_link_get(i, &link);
 
 			if (rte_eth_dev_get_mtu(i, &mtu) == 0)
-				SCLogNotice(" -- mtu: %u", mtu);
+				SCLogDebug(" -- mtu: %u", mtu);
 
-			SCLogNotice(" -- promiscuous: %s", rte_eth_promiscuous_get(i)?"yes":"no");
+			SCLogDebug(" -- promiscuous: %s", rte_eth_promiscuous_get(i)?"yes":"no");
 
-			SCLogNotice(" -- link info: speed %u, duplex %u, autoneg %u, status %u",
+			SCLogDebug(" -- link info: speed %u, duplex %u, autoneg %u, status %u",
 					link.link_speed, link.link_duplex,
 					link.link_autoneg, link.link_status);
 
-			SCLogNotice(" -- driver: %s", info.driver_name);
-			SCLogNotice(" -- NUMA node: %d", rte_eth_dev_socket_id(i));
-			SCLogNotice(" ");
+			SCLogDebug(" -- driver: %s", info.driver_name);
+			SCLogDebug(" -- NUMA node: %d", rte_eth_dev_socket_id(i));
 		}
 	}
 #endif
@@ -1240,12 +1198,12 @@ static void DumpGlobalConfig(void)
 	SCLogInfo("\n ERROR: DPDK not supported!");
 #else
 
-	SCLogNotice("----- Global DPDK Config -----");
+	SCLogDebug("----- Global DPDK Config -----");
 
 	ListDpdkConfig();
 	ListDpdkPorts();
 
-	SCLogNotice("------------------------------");
+	SCLogDebug("------------------------------");
 #endif
 
 	return;
@@ -1309,7 +1267,8 @@ dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unus
 
 		if (!(m->packet_type & ptype_ipmask)) {
 			uint16_t fwdport = dpdk_config.portmap[port][1];
-			if (rte_eth_tx_burst(fwdport, 0, &m, 1) != 1) {
+			SCLogNotice("dpdk_mbuf_ptype_fiter_nonip %u:%u", fwdport, qidx);
+			if (rte_eth_tx_burst(fwdport, qidx, &m, 1) != 1) {
 				/* todo: update counters */
 				rte_pktmbuf_free(m);
 			}
@@ -1364,7 +1323,7 @@ dpdk_sw_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unused,
 		if (unlikely((eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4)) && 
 			(eth_hdr->ether_type != rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV6)))) {
 			uint16_t fwdport = dpdk_config.portmap[port][1];
-			if (rte_eth_tx_burst(fwdport, 0, &m, 1) != 1) {
+			if (rte_eth_tx_burst(fwdport, qidx, &m, 1) != 1) {
 				/* todo: update counters */
 				rte_pktmbuf_free(m);
 			}

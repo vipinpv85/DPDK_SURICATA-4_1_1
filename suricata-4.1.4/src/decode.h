@@ -62,6 +62,9 @@ enum PktSrcEnum {
 #include "source-ipfw.h"
 #include "source-pcap.h"
 #include "source-af-packet.h"
+#ifdef HAVE_DPDK
+#include "source-dpdk.h"
+#endif
 #include "source-mpipe.h"
 #include "source-netmap.h"
 #include "source-windivert.h"
@@ -463,6 +466,9 @@ typedef struct Packet_
 #ifdef AF_PACKET
         AFPPacketVars afp_v;
 #endif
+#ifdef HAVE_DPDK
+        DpdkPacketVars dpdk_v;
+#endif /* dpdk mbuf */
 #ifdef HAVE_MPIPE
         /* tilegx mpipe stuff */
         MpipePacketVars mpipe_v;

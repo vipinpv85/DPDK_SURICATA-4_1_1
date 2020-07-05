@@ -197,57 +197,93 @@ void TmModuleDecodeDpdkRegister (void)
 	SCReturn;
 }
 
-#if DPDK_FUTURE
-/* Release Packet without sending. */
-void DpdkReleasePacket(Packet *p)
-{
-    /* Use this thread's context to free the packet. */
-}
-
-/* Unconditionally send packet, then release packet buffer. */
-void DpdkReleasePacketCopyTap(Packet *p)
-{
-}
-
-/* Release Packet and send copy if action is not DROP. */
-void DpdkReleasePacketCopyIPS(Packet *p)
-{
-    if (unlikely(PACKET_TEST_ACTION(p, ACTION_DROP))) {
-        /* Return packet buffer without sending the packet. */
-        DpdkReleasePacket(p);
-    } else {
-        /* Send packet */
-        DpdkReleasePacketCopyTap(p);
-    }
-}
 
 static void SendNoOpPacket(ThreadVars *tv, TmSlot *slot)
 {
-    Packet *p = PacketPoolGetPacket();
-    if (p == NULL) {
-        return;
-    }
+	Packet *p = PacketPoolGetPacket();
+	if (p == NULL) {
+		return;
+	}
 
-    p->datalink = DLT_RAW;
-    p->proto = IPPROTO_TCP;
+	p->datalink = DLT_RAW;
+	p->proto = IPPROTO_TCP;
 
-    /* So that DecodeMpipe ignores is. */
-    p->flags |= PKT_PSEUDO_STREAM_END;
+	p->flags |= PKT_PSEUDO_STREAM_END;
+	p->flow = NULL;
 
-    p->flow = NULL;
+	TmThreadsSlotProcessPkt(tv, slot, p);
+}
 
-    TmThreadsSlotProcessPkt(tv, slot, p);
+#if HAVE_DPDK
+void DpdkReleasePacket(Packet *p)
+{
+	SCLogDebug(" IDS action is to drop");
+	struct rte_mbuf *m = (struct rte_mbuf *) p->dpdk_v.m;
+	rte_pktmbuf_free(m);
+}
+
+void DpdkFowardPacket(Packet *p)
+{
+	struct rte_mbuf *m = (struct rte_mbuf *) p->dpdk_v.m;
+
+	if (unlikely(PACKET_TEST_ACTION(p, ACTION_DROP))) {
+		SCLogDebug(" IPS action is to drop");
+		rte_pktmbuf_free(m);
+		return;
+	}
+
+	SCLogDebug(" IPS action is to fwd from (%u:%u) to (%u:%u)",p->dpdk_v.inP, p->dpdk_v.inQ, p->dpdk_v.outP, p->dpdk_v.outQ);
+	if (rte_eth_tx_burst(p->dpdk_v.outP, p->dpdk_v.outQ, &m, 1) != 1) {
+		rte_pktmbuf_free(m);
+	}
+}
+
+static inline
+Packet *DpdkProcessPacket(DpdkThreadVars *ptv, struct rte_mbuf *m)
+{
+	u_char *pkt = rte_pktmbuf_mtod(m, u_char *);
+	Packet *p = (Packet *)(rte_mbuf_to_priv(m));
+	
+	PACKET_RECYCLE(p);
+	PKT_SET_SRC(p, PKT_SRC_WIRE);
+
+	ptv->bytes += m->pkt_len;
+	ptv->pkts += 1;
+
+	gettimeofday(&p->ts, NULL);
+	
+	p->datalink = LINKTYPE_ETHERNET;
+	/* No need to check return value, since the only error is pkt == NULL which can't happen here. */
+	PacketSetData(p, pkt, m->pkt_len);
+
+	/* dpdk Intel sepcific details */
+	p->dpdk_v.m = (void *) m;
+	p->dpdk_v.inP = ptv->portid;
+	p->dpdk_v.outP = ptv->fwd_portid;
+	p->dpdk_v.inQ = ptv->queueid;
+	p->dpdk_v.outQ = ptv->fwd_queueid;
+	/* BYPASS - 0, IDS - 1, IPS - 2*/
+	p->ReleasePacket = (ptv->mode == 1) ? DpdkReleasePacket : DpdkFowardPacket;
+
+	/* we are enabling DPDK PMD to validatte checksum - HW NIC offlaods */
+	p->flags |= ptv->checksumMode;
+
+	return p;
 }
 #endif
 
 TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 {
 	SCEnter();
-
 	SCLogDebug(" Loop to fetch and put packets");
+
+	uint64_t last_packet_time = rte_get_tsc_cycles(), now = 0;
 
 #if HAVE_DPDK
 	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
+	TmSlot *s = (TmSlot *)slot;
+	ptv->slot = s->slot_next;
+	Packet *p = NULL;
 
 	SCLogDebug(" running on %d core %d\n", (int)pthread_self(), sched_getcpu());
 
@@ -255,138 +291,66 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 		SCReturnInt(TM_ECODE_FAILED);
 	}
 
-	//SCLogNotice("RX-TX Intf Id in %d out %d\n", ptv->portQueuePair[0] & 0xffff, (ptv->portQueuePair[0] >> 32)&0xffff);
-	SCLogDebug("RX-TX Intf Id in %d out %d\n", ptv->portid, ptv->fwd_portid);
+	while(1) {
+		if (unlikely(suricata_ctl_flags != 0)) {
+			SCLogDebug(" Stopping port RX (%d) Queue (%d)", ptv->portid, ptv->queueid);
+			if (rte_eth_dev_rx_queue_stop(ptv->portid, ptv->queueid) != 0)
+				SCReturnInt(TM_ECODE_FAILED);
 
-	struct rte_mbuf *bufs[16];
-	const uint16_t nb_rx = rte_eth_rx_burst(ptv->portid, ptv->queueid, bufs, 16);
+			break;
+		}
 
-	if (likely(ptv->mode != 0)) {
-		if (likely(nb_rx)) {
-			const uint16_t nb_tx = rte_eth_tx_burst(ptv->fwd_portid, ptv->fwd_queueid, bufs, nb_rx);
-			/* Free any unsent packets. */
-			if (unlikely(nb_tx < nb_rx)) {
-				uint16_t buf;
-				//rte_pktmbuf_free_bulk(bufs, nb_rx);
-				for (buf = nb_tx; buf < nb_rx; buf++)
-					rte_pktmbuf_free(bufs[buf]);
+		SCLogDebug("RX-TX in %d out %d\n", ptv->portid, ptv->fwd_portid);
+
+		struct rte_mbuf *bufs[16];
+		const uint16_t nb_rx = rte_eth_rx_burst(ptv->portid, ptv->queueid, bufs, 16);
+
+		if (likely(ptv->mode != 0)) {
+			if (likely(nb_rx)) {
+
+				for (int i = 0; i < nb_rx; i++) {
+					p = DpdkProcessPacket(ptv, bufs[i]);
+
+					if (unlikely(TmThreadsSlotProcessPkt(ptv->tv, ptv->slot, p) != TM_ECODE_OK)) {
+						TmqhOutputPacketpool(ptv->tv, p);
+						SCLogNotice(" failed TmThreadsSlotProcessPkt");
+						SCReturnInt(TM_ECODE_FAILED);
+					}
+				}
+
+#if DPDK-TEST
+				const uint16_t nb_tx = rte_eth_tx_burst(ptv->fwd_portid, ptv->fwd_queueid, bufs, nb_rx);
+				/* Free any unsent packets. */
+				if (unlikely(nb_tx < nb_rx)) {
+					uint16_t buf;
+					/* rte_pktmbuf_free_bulk(bufs, nb_rx); */
+					for (buf = nb_tx; buf < nb_rx; buf++)
+						rte_pktmbuf_free(bufs[buf]);
+					ptv->failtx += (uint64_t)(nb_rx - nb_tx);
+				}
+#endif
+			}
+			else {
+				ptv->emptyrx += (uint64_t)1;
+				usleep(1);
+			}
+
+			{
+				now = rte_get_tsc_cycles();
+				if (now - last_packet_time > 100000000) {
+					SendNoOpPacket(ptv->tv, ptv->slot);
+					last_packet_time = now;
+				}
 			}
 		}
-		else
-			usleep(1);
 	}
 
-#if 0
-	TmSlot *s = (TmSlot *)slot;
-	//ptv->slot = s->slot_next;
-	Packet *p = NULL;
-	int rank = tv->rank;
-	int max_queued = 0;
-	char *ctype;
-    ptv->checksum_mode = CHECKSUM_VALIDATION_DISABLE;
-    if (ConfGet("mpipe.checksum-checks", &ctype) == 1) {
-        if (ConfValIsTrue(ctype)) {
-            ptv->checksum_mode = CHECKSUM_VALIDATION_ENABLE;
-        } else if (ConfValIsFalse(ctype))  {
-            ptv->checksum_mode = CHECKSUM_VALIDATION_DISABLE;
-        } else {
-            SCLogError(SC_ERR_INVALID_ARGUMENT, 
-                       "Invalid value for checksum-check for mpipe");
-        }
-    }
-
-    /* Open Ingress Queue for this worker thread. */
-    MpipeReceiveOpenIqueue(rank);
-    gxio_mpipe_iqueue_t* iqueue = thread_iqueue;
-    int update_counter = 0;
-    uint64_t last_packet_time = get_cycle_count();
-
-    for (;;) {
-
-        /* Check to see how many packets are available to process. */
-        gxio_mpipe_idesc_t *idesc;
-        int n = gxio_mpipe_iqueue_try_peek(iqueue, &idesc);
-        if (likely(n > 0)) {
-            int i;
-            int m = min(n, 16);
-
-            /* Prefetch the idescs (64 bytes each). */
-            for (i = 0; i < m; i++) {
-                __insn_prefetch(&idesc[i]);
-            }
-            if (unlikely(n > max_queued)) {
-                StatsSetUI64(tv, ptv->max_mpipe_depth,
-                                     (uint64_t)n);
-                max_queued = n;
-            }
-            for (i = 0; i < m; i++, idesc++) {
-                if (likely(!gxio_mpipe_idesc_has_error(idesc))) {
-                    p = MpipeProcessPacket(ptv, idesc);
-                    p->mpipe_v.rank = rank;
-                    if (TmThreadsSlotProcessPkt(ptv->tv, ptv->slot, p) != TM_ECODE_OK) {
-                        TmqhOutputPacketpool(ptv->tv, p);
-                        SCReturnInt(TM_ECODE_FAILED);
-                    }
-                } else {
-                    if (idesc->be) {
-            if (unlikely(n > max_queued)) {
-                StatsSetUI64(tv, ptv->max_mpipe_depth,
-                                     (uint64_t)n);
-                max_queued = n;
-            }
-            for (i = 0; i < m; i++, idesc++) {
-                if (likely(!gxio_mpipe_idesc_has_error(idesc))) {
-                    p = MpipeProcessPacket(ptv, idesc);
-                    p->mpipe_v.rank = rank;
-                    if (TmThreadsSlotProcessPkt(ptv->tv, ptv->slot, p) != TM_ECODE_OK) {
-                        TmqhOutputPacketpool(ptv->tv, p);
-                        SCReturnInt(TM_ECODE_FAILED);
-                    }
-                } else {
-                    if (idesc->be) {
-                        /* Buffer Error - No buffer available, so mPipe
-                         * dropped the packet. */
-                        StatsIncr(tv, XlateStack(ptv, idesc->stack_idx));
-                    } else {
-                        /* Bad packet. CRC error */
-                        StatsIncr(tv, ptv->mpipe_drop);
-                        gxio_mpipe_iqueue_drop(iqueue, idesc);
-                    }
-                    gxio_mpipe_iqueue_release(iqueue, idesc);
-                }
-            }
-            /* Move forward M packets in ingress ring. */
-            gxio_mpipe_iqueue_advance(iqueue, m);
-
-            last_packet_time = get_cycle_count();
-        }
-        if (update_counter-- <= 0) {
-            /* Only periodically update and check for termination. */
-            StatsSyncCountersIfSignalled(tv);
-            update_counter = 10000;
-
-            if (suricata_ctl_flags != 0) {
-              break;
-            }
-
-            // If no packet has been received for some period of time, process a NOP packet
-            // just to make sure that pseudo packets from the Flow manager get processed.
-            uint64_t now = get_cycle_count();
-            if (now - last_packet_time > 100000000) {
-                SendNoOpPacket(ptv->tv, ptv->slot);
-                last_packet_time = now;
-            }
-        }
-    }
-#endif
-
-    SCReturnInt(TM_ECODE_OK);
+	SCReturnInt(TM_ECODE_OK);
 }
 
 TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 {
 	SCEnter();
-	SCLogNotice(" Kick start thread \n");
 
 #if HAVE_DPDK
 	if (initdata == NULL) {
@@ -418,7 +382,7 @@ TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 	*data = (void *)ptv;
 #endif
 
-	SCLogNotice("completed thread initialization for dpdk receive\n");
+	SCLogDebug("completed thread initialization for dpdk receive\n");
 	SCReturnInt(TM_ECODE_OK);
 }
 
@@ -428,24 +392,38 @@ TmEcode ReceiveDpdkDeinit(ThreadVars *tv, void *data)
 	SCEnter();
 	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
 
+	/* stop RX queue */
 	rte_free(data);
+	data = NULL;
 	SCReturnInt(TM_ECODE_OK);
 }
 
 
 void ReceiveDpdkThreadExitStats(ThreadVars *tv, void *data)
 {
-    SCEnter();
-    SCReturn;
+	SCEnter();
+
+	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
+	SCLogNotice(" --- STATS from Port (%u) Queue (%d) ---", ptv->portid, ptv->queueid);
+	SCLogNotice(" - Mode (%u)", ptv->mode);
+	SCLogNotice(" - FWD Port (%u) Queue (%u)", ptv->fwd_portid, ptv->fwd_queueid);
+	SCLogNotice(" - pkts (%"PRIu64"), bytes (%"PRIu64"), err (%"PRIu64")", ptv->pkts, ptv->bytes, ptv->errs);
+	SCLogNotice(" - ERR: emptyrx (%"PRIu64"), failtx (%"PRIu64")", ptv->emptyrx, ptv->failtx);
+	SCLogNotice(" - IPV4: non-frag (%"PRIu64") frag (%"PRIu64")", ptv->ipv4, ptv->ipv4frag);
+	SCLogNotice(" - IPV6: non-frag (%"PRIu64") frag (%"PRIu64")", ptv->ipv6, ptv->ipv6frag);
+	SCLogNotice(" - ACL Lookup: success (%"PRIu64"), fail (%"PRIu64"), hit (%"PRIu64"), miss (%"PRIu64")", ptv->acllkp_succ, ptv->acllkp_fail, ptv->acllkp_hit, ptv->acllkp_miss);
+	SCLogNotice(" - err-recv (%"PRIu64"), err-decode (%"PRIu64")", ptv->err_recv, ptv->err_decode);
+
+	SCReturn;
 }
 
 TmEcode DecodeDpdkThreadInit(ThreadVars *tv, void *initdata, void **data)
 {
-    SCEnter();
-	SCLogNotice(" inside decode thread");
+	SCEnter();
+	SCLogDebug(" inside decode thread");
 
 #if HAVE_DPDK
-    DecodeThreadVars *dtv = NULL;
+	DecodeThreadVars *dtv = NULL;
 
     dtv = DecodeThreadVarsAlloc(tv);
 
@@ -462,9 +440,20 @@ TmEcode DecodeDpdkThreadInit(ThreadVars *tv, void *initdata, void **data)
 
 TmEcode DecodeDpdkThreadDeinit(ThreadVars *tv, void *data)
 {
-    if (data != NULL)
-        DecodeThreadVarsFree(tv, data);
-    SCReturnInt(TM_ECODE_OK);
+	SCEnter();
+
+#if HAVE_DPDK
+	SCLogNotice(" inside DecodeDpdkThreadDeinit ");
+
+	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
+
+	if (data != NULL)
+		DecodeThreadVarsFree(tv, data);
+
+	SCLogNotice(" freed data!");
+#endif
+
+	SCReturnInt(TM_ECODE_OK);
 }
 
 TmEcode DecodeDpdk(ThreadVars *tv, Packet *p, void *data, PacketQueue *pq, 
@@ -475,40 +464,20 @@ TmEcode DecodeDpdk(ThreadVars *tv, Packet *p, void *data, PacketQueue *pq,
 
     /* XXX HACK: flow timeout can call us for injected pseudo packets
      *           see bug: https://redmine.openinfosecfoundation.org/issues/1107 */
-    if (p->flags & PKT_PSEUDO_STREAM_END)
+    if (p->flags & PKT_PSEUDO_STREAM_END) {
+//        PacketPoolReturnPacket(p);
         return TM_ECODE_OK;
+    }
 
     /* update counters */
     DecodeUpdatePacketCounters(tv, dtv, p);
 
     /* call the decoder */
-    DecodeEthernet(tv, dtv, p, GET_PKT_DATA(p), GET_PKT_LEN(p), pq);
+    DecodeEthernet(tv, dtv, p, (uint8_t *) rte_pktmbuf_mtod(p->dpdk_v.m, uint8_t *), p->dpdk_v.m->pkt_len, pq);
 
     PacketDecodeFinalize(tv, dtv, p);
 
     SCReturnInt(TM_ECODE_OK);
 }
-
-#if DPDK_FUTURE
-int DpdkLiveRegisterDevice(char *dev)
-{
-#if HAVE_DPDK
-    DpdkDevice *nd = SCMalloc(sizeof(DpdkDevice));
-    if (unlikely(nd == NULL)) {
-        return -1;
-    }
-
-    nd->dev = SCStrdup(dev);
-    if (unlikely(nd->dev == NULL)) {
-        SCFree(nd);
-        return -1;
-    }
-    TAILQ_INSERT_TAIL(&dpdk_devices, nd, next);
-#endif
-
-    SCLogDebug("DPDK device \"%s\" registered.", dev);
-    return 0;
-}
-#endif
 
 #endif // HAVE_DPDK

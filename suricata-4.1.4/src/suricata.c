@@ -3126,12 +3126,6 @@ int main(int argc, char **argv)
             exit(EXIT_FAILURE);
         }
 
-        SCLogDebug(" init Connection Ring!\n");
-        if (CreateDpdkRing() != 0) {
-            SCLogError(SC_ERR_DPDK_CONFIG, " Failed to create Ring!");
-            exit(EXIT_FAILURE);
-        }
-
         SCLogDebug(" run mode %u is ips %u is ids %u ", GetRunMode(), EngineModeIsIPS(), EngineModeIsIDS());
         if (GetRunMode() == 1)
             EngineModeSetIDS();

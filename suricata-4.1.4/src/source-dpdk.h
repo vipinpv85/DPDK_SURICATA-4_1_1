@@ -86,6 +86,16 @@ typedef struct DpdkIfaceConfig
     //SC_ATOMIC_DECLARE(unsigned int, ref);
 } DpdkIfaceConfig_t;
 
+typedef struct DpdkPacketVars_s
+{
+	uint16_t inP;
+	uint16_t inQ;
+	uint16_t outP;
+	uint16_t outQ;
+
+	struct rte_mbuf *m;
+} DpdkPacketVars;
+
 
 void TmModuleReceiveDpdkRegister(void);
 void TmModuleDecodeDpdkRegister(void);

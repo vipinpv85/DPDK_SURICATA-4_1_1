@@ -90,7 +90,6 @@ int ParseDpdkYaml(void);
 int CreateDpdkAcl(void);
 int CreateDpdkReassemblyFragement(void);
 int ValidateDpdkConfig(void);
-int CreateDpdkRing(void);
 uint8_t GetRunMode(void);
 
 #endif  /* __RUNMODE_DPDK_H__ */
