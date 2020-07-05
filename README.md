@@ -1,10 +1,10 @@
-# DPDK_SURICATA-4_1_1
+# DPDK_SURICATA-4_1_4
 
 porting ACL from 3.0 - work in progress
 
 ## Motivation
 
-Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mode. First step to speed up suricata open source user space application using DPDK PMD
+Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mode. 
 
 <img src="images/arch.png" width=auto>
 
@@ -14,8 +14,7 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
  - [ ] use zero copy for paylaod, PKT decode and other layers
  
 # Work in progress
- - [x] cleanup logs and debug points
- - [x] use SW ACL for classification on directional rules from `https://github.com/vipinpv85/DPDK-Suricata_3.0`.
+  - [x] use SW ACL for classification on directional rules from `https://github.com/vipinpv85/DPDK-Suricata_3.0`.
 
 # Things completed
  - [x] move dpdk config to `suricata.yaml`
@@ -24,6 +23,7 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
  - [x] add dpdk fields to suricata.yaml
  - [x] migrate to DPDK 19.11.1 LTS
  - [x] use rx-callback to filter packets which are non-ip
+ - [x] cleanup logs and debug points
 
 ## How to Build?
 
@@ -33,7 +33,7 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 ### version: 
 | software | release |
 | -- | -- |
-| DPDK | dpdk-stable-18.11.1 |
+| DPDK | dpdk-stable-19.11.3 |
 | Suricata | suricata-4.1.4 |
 
 ### Build and Run
@@ -74,7 +74,7 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
  - Pin the memory to per NUMA by editing EAL args
  - Pin the worker threads by eiditing affinity in suricata.yaml
 
-1. edit suricata.yal. 
+1. edit suricata.yaml 
 2. Search for `dpdk`
 3. under EAL append options '--socket-mem=1,1024' and '--scoket-limit=1,1024' for NUMA-1
 4. under cpu-affinity update `worker-cpu-set` for desired NUMA-1 threads
@@ -161,7 +161,8 @@ Proof of concept with single worker mode: https://github.com/vipinpv85/DPDK-Suri
 ongoing work with multi-worker: https://github.com/vipinpv85/DPDK_SURICATA-4_1_1
 
 Performance: by redirecting rule match packets to worker threads
-1. 1 worker can perform around 2.5 Mpps
-2. 10Gbps with line rate (64byte) we need to 6 workers with each worker having 2.5Mpps flows
-3. 40Gbps with line rate (128byte) we need 16 worker threads with 2.5Mpps flows each.
+1. 1 worker can perform around 1.25 Mpps
+2. 10Gbps with line rate (64byte) we need to 14 workers with each worker having 1Mpps flows
+3. 40Gbps with line rate (128byte) we need 30 worker threads with 1Mpps flows each.
+
 ```
