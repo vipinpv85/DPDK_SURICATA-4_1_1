@@ -179,6 +179,52 @@ static int DetectLoadSigFile(DetectEngineCtx *de_ctx, char *sig_file,
             }
             SCLogDebug("signature %"PRIu32" loaded", sig->id);
             good++;
+#ifdef HAVE_DPDK
+            SCLogNotice(" this looks like a good signaturei (%d), try to add to DPDK ACL!", sig->id);
+            SCLogNotice(" - alproto (%d) mask (%x) id (%u) action (%x)", sig->alproto, sig->mask, sig->num, sig->action);
+            SCLogNotice(" -- proto (flags-%x) \n", sig->proto.flags);
+
+            for (int index = 0; index < 32; index++)
+                if (sig->proto.proto[index])
+                     SCLogNotice(" --%d. (protocol-%x) \n", index, sig->proto.proto[index]);
+
+            SCLogNotice(" addr_dst_match4_cnt %u addr_src_match4_cnt %u addr_dst_match6_cnt i%u addr_src_match6_cnt %u",
+                sig->addr_dst_match4_cnt, sig->addr_src_match4_cnt, sig->addr_dst_match6_cnt, sig->addr_src_match6_cnt);
+
+            SCLogNotice(" IPV4 ");
+            for (int j = 0; j < sig->addr_src_match4_cnt; j++)
+                SCLogNotice(" %x:%x ", sig->addr_src_match4[j].ip, sig->addr_src_match4[j].ip2);
+
+            for (int j = 0; j < sig->addr_dst_match4_cnt; j++)
+                SCLogNotice(" %x:%x ", sig->addr_dst_match4[j].ip, sig->addr_dst_match4[j].ip2);
+            SCLogNotice("-----------------------");
+
+            SCLogNotice(" IPV6 ");
+            for (int j = 0; j < sig->addr_src_match6_cnt; j++)
+                SCLogNotice(" %x-%x-%x-%x:%x-%x-%x-%x ",
+                     sig->addr_src_match6[j].ip[0],  sig->addr_src_match6[j].ip[1],  sig->addr_src_match6[j].ip[2],  sig->addr_src_match6[j].ip[3],
+                     sig->addr_src_match6[j].ip2[0], sig->addr_src_match6[j].ip2[1], sig->addr_src_match6[j].ip2[2], sig->addr_src_match6[j].ip2[3]);
+
+            for (int j = 0; j < sig->addr_dst_match6_cnt; j++)
+                SCLogNotice(" %x-%x-%x-%x:%x-%x-%x-%x ",
+                     sig->addr_dst_match6[j].ip[0],  sig->addr_dst_match6[j].ip[1],  sig->addr_dst_match6[j].ip[2],  sig->addr_dst_match6[j].ip[3],
+                     sig->addr_dst_match6[j].ip2[0], sig->addr_dst_match6[j].ip2[1], sig->addr_dst_match6[j].ip2[2], sig->addr_dst_match6[j].ip2[3]);
+            SCLogNotice("-----------------------");
+
+            SCLogNotice(" Source Port ");
+            if (sig->sp) {
+                for (DetectPort *index = sig->sp; index != NULL; index = index->next)
+                    SCLogNotice(" port:port2 (%x:%x)", index->port, index->port2);
+            }
+
+            SCLogNotice(" Destiantion Port ");
+            if (sig->dp) {
+                for (DetectPort *index = sig->dp; index != NULL; index = index->next)
+                    SCLogNotice(" port:port2 (%x:%x)", index->port, index->port2);
+            }
+
+            SCLogNotice(" prio %u ", sig->prio);
+#endif
         } else {
             SCLogError(SC_ERR_INVALID_SIGNATURE, "error parsing signature \"%s\" from "
                  "file %s at line %"PRId32"", line, sig_file, lineno - multiline);

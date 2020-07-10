@@ -86,8 +86,6 @@ typedef struct DpdkThreadVars_
 	uint8_t promiscous;
 
 	/* dpdk params */
-	uint16_t portQueuePairCount;
-	uint64_t portQueuePair[RTE_MAX_ETHPORTS * RTE_MAX_QUEUES_PER_PORT];
 
 	/** stats/counters */
 	uint64_t pkts;
@@ -303,12 +301,13 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 		SCLogDebug("RX-TX in %d out %d\n", ptv->portid, ptv->fwd_portid);
 
 		struct rte_mbuf *bufs[16];
-		const uint16_t nb_rx = rte_eth_rx_burst(ptv->portid, ptv->queueid, bufs, 16);
+		const uint16_t nb_rx = rte_eth_rx_burst(ptv->portid, ptv->queueid, bufs, 8);
 
 		if (likely(ptv->mode != 0)) {
 			if (likely(nb_rx)) {
 
 				for (int i = 0; i < nb_rx; i++) {
+					SCLogDebug("RX-TX in %d rss %u\n", ptv->portid, bufs[i]->hash.rss /*ol_flags & PKT_RX_RSS_HASH*/);
 					p = DpdkProcessPacket(ptv, bufs[i]);
 
 					if (unlikely(TmThreadsSlotProcessPkt(ptv->tv, ptv->slot, p) != TM_ECODE_OK)) {
@@ -335,6 +334,7 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 				usleep(1);
 			}
 
+#if 0
 			{
 				now = rte_get_tsc_cycles();
 				if (now - last_packet_time > 100000000) {
@@ -342,6 +342,8 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 					last_packet_time = now;
 				}
 			}
+#endif
+
 		}
 	}
 
@@ -404,15 +406,24 @@ void ReceiveDpdkThreadExitStats(ThreadVars *tv, void *data)
 	SCEnter();
 
 	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
-	SCLogNotice(" --- STATS from Port (%u) Queue (%d) ---", ptv->portid, ptv->queueid);
-	SCLogNotice(" - Mode (%u)", ptv->mode);
-	SCLogNotice(" - FWD Port (%u) Queue (%u)", ptv->fwd_portid, ptv->fwd_queueid);
-	SCLogNotice(" - pkts (%"PRIu64"), bytes (%"PRIu64"), err (%"PRIu64")", ptv->pkts, ptv->bytes, ptv->errs);
-	SCLogNotice(" - ERR: emptyrx (%"PRIu64"), failtx (%"PRIu64")", ptv->emptyrx, ptv->failtx);
-	SCLogNotice(" - IPV4: non-frag (%"PRIu64") frag (%"PRIu64")", ptv->ipv4, ptv->ipv4frag);
-	SCLogNotice(" - IPV6: non-frag (%"PRIu64") frag (%"PRIu64")", ptv->ipv6, ptv->ipv6frag);
-	SCLogNotice(" - ACL Lookup: success (%"PRIu64"), fail (%"PRIu64"), hit (%"PRIu64"), miss (%"PRIu64")", ptv->acllkp_succ, ptv->acllkp_fail, ptv->acllkp_hit, ptv->acllkp_miss);
-	SCLogNotice(" - err-recv (%"PRIu64"), err-decode (%"PRIu64")", ptv->err_recv, ptv->err_decode);
+	SCLogNotice(" ----- stats from worker thread -----");
+	SCLogNotice(" | worker (Port:Queue) IN %2u:%2u - OUT %2u:%2u", ptv->portid, ptv->queueid, ptv->fwd_portid, ptv->fwd_queueid);
+	SCLogNotice(" | PKT count          | %20"PRIu64, ptv->pkts);
+	SCLogNotice(" | PKT bytes          | %20"PRIu64, ptv->bytes);
+	SCLogNotice(" | PKT error count    | %20"PRIu64, ptv->errs);
+	SCLogNotice(" | PKT emptyrx        | %20"PRIu64, ptv->emptyrx);
+	SCLogNotice(" | PKT failtx         | %20"PRIu64, ptv->failtx);
+	SCLogNotice(" | IPV4 non-frag      | %20"PRIu64, ptv->ipv4);
+	SCLogNotice(" | IPV6 non-frag      | %20"PRIu64, ptv->ipv6);
+	SCLogNotice(" | IPV4 frag          | %20"PRIu64, ptv->ipv4frag);
+	SCLogNotice(" | IPV6 frag          | %20"PRIu64, ptv->ipv6frag);
+	SCLogNotice(" | ACL Lookup success | %20"PRIu64, ptv->acllkp_succ);
+	SCLogNotice(" | ACL Lookup fail    | %20"PRIu64, ptv->acllkp_fail);
+	SCLogNotice(" | ACL Lookup hit     | %20"PRIu64, ptv->acllkp_hit);
+	SCLogNotice(" | ACL Lookup miss    | %20"PRIu64, ptv->acllkp_miss);
+	SCLogNotice(" | ERR recv           | %20"PRIu64, ptv->err_recv);
+	SCLogNotice(" | ERR decode         | %20"PRIu64, ptv->err_decode);
+	SCLogNotice(" -----------------------------------");
 
 	SCReturn;
 }

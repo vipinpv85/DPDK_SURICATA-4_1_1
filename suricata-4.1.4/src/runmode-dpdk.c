@@ -94,6 +94,7 @@ struct rte_eth_conf port_conf = {
 	.rx_adv_conf = {
 		.rss_conf = {
 			.rss_key = NULL,
+			.rss_key_len = 40,
 			.rss_hf = ETH_RSS_IP | ETH_RSS_TCP | ETH_RSS_UDP | ETH_RSS_SCTP,
 		},
 	},
@@ -344,6 +345,74 @@ const char *RunModeDpdkGetDefaultMode(void)
 	return dpdk_default_mode;
 }
 
+static int sym_hash_enable(int port_id, uint32_t ftype, enum rte_eth_hash_function function)
+{
+    struct rte_eth_hash_filter_info info;
+    int ret = 0;
+    uint32_t idx = 0;
+    uint32_t offset = 0;
+
+    memset(&info, 0, sizeof(info));
+
+    ret = rte_eth_dev_filter_supported(port_id, RTE_ETH_FILTER_HASH);
+    if (ret < 0) {
+        printf("RTE_ETH_FILTER_HASH not supported on port: %d",
+                         port_id);
+        return ret;
+    }
+
+    info.info_type = RTE_ETH_HASH_FILTER_GLOBAL_CONFIG;
+    info.info.global_conf.hash_func = function;
+
+    idx = ftype / UINT64_BIT;
+    offset = ftype % UINT64_BIT;
+    info.info.global_conf.valid_bit_mask[idx] |= (1ULL << offset);
+    info.info.global_conf.sym_hash_enable_mask[idx] |=
+                        (1ULL << offset);
+
+    ret = rte_eth_dev_filter_ctrl(port_id, RTE_ETH_FILTER_HASH,
+                                  RTE_ETH_FILTER_SET, &info);
+    if (ret < 0)
+    {
+        printf("Cannot set global hash configurations"
+                        "on port %u", port_id);
+        return ret;
+    }
+
+    return 0;
+}
+
+
+static int sym_hash_set(int port_id, int enable)
+{
+    int ret = 0;
+    struct rte_eth_hash_filter_info info;
+
+    memset(&info, 0, sizeof(info));
+
+    ret = rte_eth_dev_filter_supported(port_id, RTE_ETH_FILTER_HASH);
+    if (ret < 0) {
+        printf("RTE_ETH_FILTER_HASH not supported on port: %d",
+                         port_id);
+        return ret;
+    }
+
+    info.info_type = RTE_ETH_HASH_FILTER_SYM_HASH_ENA_PER_PORT;
+    info.info.enable = enable;
+    ret = rte_eth_dev_filter_ctrl(port_id, RTE_ETH_FILTER_HASH,
+                        RTE_ETH_FILTER_SET, &info);
+
+    if (ret < 0)
+    {
+        printf("Cannot set symmetric hash enable per port "
+                        "on port %u", port_id);
+        return ret;
+    }
+
+    return 0;
+}
+
+
 void RunModeDpdkRegister(void)
 {
 	SCEnter();
@@ -377,9 +446,9 @@ static int SetupDdpdkPorts(void)
 	if (rte_mempool_lookup(dpdk_mempool_config.name) == NULL) {
 		dpdk_mempool_config.mbuf_ptr = rte_pktmbuf_pool_create(
 				dpdk_mempool_config.name, dpdk_mempool_config.n,
-				/* MEMPOOL_CACHE_SIZE*/ 256,
+				/* MEMPOOL_CACHE_SIZE*/ 128,
 				sizeof(Packet) /*dpdk_mempool_config.private_data_size*/,
-				RTE_MBUF_DEFAULT_BUF_SIZE,
+				/*RTE_MBUF_DEFAULT_BUF_SIZE*/ 2048,
 				dpdk_mempool_config.socket_id);
 	}
 
@@ -415,10 +484,11 @@ static int SetupDdpdkPorts(void)
 			local_port_conf.rxmode.mq_mode = ETH_MQ_RX_NONE;
 		} else {
 			SCLogNotice(" Port %u RX-q (%u) hence trying RSS", i, dpdk_ports[i].rxq_count);
+
 			local_port_conf.rx_adv_conf.rss_conf.rss_hf &= dev_info.flow_type_rss_offloads;
 			if (local_port_conf.rx_adv_conf.rss_conf.rss_hf != port_conf.rx_adv_conf.rss_conf.rss_hf) {
 				SCLogInfo(" Port %u modified RSS hash function based on hardware support,"
-						"requested:%#"PRIx64" configured:%#"PRIx64,
+						"requested:%"PRIx64" configured:%"PRIx64,
 						i,
 						port_conf.rx_adv_conf.rss_conf.rss_hf,
 						local_port_conf.rx_adv_conf.rss_conf.rss_hf);
@@ -432,6 +502,24 @@ static int SetupDdpdkPorts(void)
 			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to configure port [%d]", i);
 			return -EINVAL;
 		}
+
+		struct rte_eth_rss_conf rss_conf = {0};
+		if (rte_eth_dev_rss_hash_conf_get (i, &rss_conf) != 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, "Failed to rte_eth_dev_rss_hash_conf_get for [%d]", i);
+			return -EINVAL;
+		}
+
+		SCLogNotice(" rss_hf %"PRIx64", rss_key_len %u", rss_conf.rss_hf, rss_conf.rss_key_len);
+		for (int k = 0; k < rss_conf.rss_key_len; k++)
+			printf("%x:", rss_conf.rss_key[k]);
+		printf("\n");
+
+		sym_hash_enable(i, RTE_ETH_FLOW_NONFRAG_IPV4_TCP,   RTE_ETH_HASH_FUNCTION_TOEPLITZ);
+		sym_hash_enable(i, RTE_ETH_FLOW_NONFRAG_IPV4_UDP,   RTE_ETH_HASH_FUNCTION_TOEPLITZ);
+		sym_hash_enable(i, RTE_ETH_FLOW_FRAG_IPV4,          RTE_ETH_HASH_FUNCTION_TOEPLITZ);
+		sym_hash_enable(i, RTE_ETH_FLOW_NONFRAG_IPV4_SCTP,  RTE_ETH_HASH_FUNCTION_TOEPLITZ);
+		sym_hash_enable(i, RTE_ETH_FLOW_NONFRAG_IPV4_OTHER, RTE_ETH_HASH_FUNCTION_TOEPLITZ);
+		sym_hash_set(i, 1);
 
 		for (j = 0; j < dpdk_ports[i].rxq_count; j++) {
 			struct rte_eth_rxconf rxq_conf;
@@ -831,8 +919,6 @@ int ParseDpdkYaml(void)
 		}
 
 		TAILQ_FOREACH(sub_node, &Node->head, next) {
-			SCLogNotice(" sub_node (%s:%s) ", sub_node->name, sub_node->val);
-
 			if (dpdk_config.mode != 1 /* IPS/BYPASS */) {
 				char *val_fld[2];
 
@@ -1267,7 +1353,7 @@ dpdk_mbuf_ptype_fiter_nonip(uint16_t port __rte_unused, uint16_t qidx __rte_unus
 
 		if (!(m->packet_type & ptype_ipmask)) {
 			uint16_t fwdport = dpdk_config.portmap[port][1];
-			SCLogNotice("dpdk_mbuf_ptype_fiter_nonip %u:%u", fwdport, qidx);
+			SCLogDebug("dpdk_mbuf_ptype_fiter_nonip %u:%u", fwdport, qidx);
 			if (rte_eth_tx_burst(fwdport, qidx, &m, 1) != 1) {
 				/* todo: update counters */
 				rte_pktmbuf_free(m);
