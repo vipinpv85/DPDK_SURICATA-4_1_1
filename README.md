@@ -9,7 +9,6 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
 <img src="images/arch.png" width=auto>
 
 # Things to do
- - [ ] implement SW or HW Symmetric Hashing for reassembled packets.
  - [ ] flatten the packet buffer for full zero-copy mode.
  - [ ] use zero copy for paylaod, PKT decode and other layers
  
@@ -17,6 +16,7 @@ Create simple DPDK RX-TX to allow packets into SURICATA processing pipeiline mod
   - [x] use SW ACL for classification on directional rules from `https://github.com/vipinpv85/DPDK-Suricata_3.0`.
 
 # Things completed
+ - [x] implement SW or HW Symmetric Hashing for reassembled packets.
  - [x] move dpdk config to `suricata.yaml`
  - [x] allow multiple worker rather than single worker
  - [x] allow multiple RX queue with RSS (default)
