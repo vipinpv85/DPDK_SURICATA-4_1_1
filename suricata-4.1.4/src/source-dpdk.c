@@ -84,6 +84,7 @@ typedef struct DpdkThreadVars_
 	int copy_mode;
 	uint8_t checksumMode;
 	uint8_t promiscous;
+	void *txbuffer;
 
 	/* dpdk params */
 
@@ -195,23 +196,6 @@ void TmModuleDecodeDpdkRegister (void)
 	SCReturn;
 }
 
-
-static void SendNoOpPacket(ThreadVars *tv, TmSlot *slot)
-{
-	Packet *p = PacketPoolGetPacket();
-	if (p == NULL) {
-		return;
-	}
-
-	p->datalink = DLT_RAW;
-	p->proto = IPPROTO_TCP;
-
-	p->flags |= PKT_PSEUDO_STREAM_END;
-	p->flow = NULL;
-
-	TmThreadsSlotProcessPkt(tv, slot, p);
-}
-
 #if HAVE_DPDK
 void DpdkReleasePacket(Packet *p)
 {
@@ -230,10 +214,24 @@ void DpdkFowardPacket(Packet *p)
 		return;
 	}
 
-	SCLogDebug(" IPS action is to fwd from (%u:%u) to (%u:%u)",p->dpdk_v.inP, p->dpdk_v.inQ, p->dpdk_v.outP, p->dpdk_v.outQ);
+	SCLogDebug(" IPS action is to fwd from (%u:%u) to (%u:%u)", p->dpdk_v.inP, p->dpdk_v.inQ, p->dpdk_v.outP, p->dpdk_v.outQ);
 	if (rte_eth_tx_burst(p->dpdk_v.outP, p->dpdk_v.outQ, &m, 1) != 1) {
 		rte_pktmbuf_free(m);
 	}
+}
+
+void DpdkBufferFowardPacket(Packet *p)
+{
+	struct rte_mbuf *m = (struct rte_mbuf *) p->dpdk_v.m;
+
+	if (unlikely(PACKET_TEST_ACTION(p, ACTION_DROP))) {
+		SCLogDebug(" IPS action is to drop");
+		rte_pktmbuf_free(m);
+		return;
+	}
+
+	SCLogDebug(" IPS action is to buffer fwd from (%u:%u) to (%u:%u)", p->dpdk_v.inP, p->dpdk_v.inQ, p->dpdk_v.outP, p->dpdk_v.outQ);
+	rte_eth_tx_buffer(p->dpdk_v.outP, p->dpdk_v.outQ, p->dpdk_v.buffer, m);
 }
 
 static inline
@@ -241,7 +239,7 @@ Packet *DpdkProcessPacket(DpdkThreadVars *ptv, struct rte_mbuf *m)
 {
 	u_char *pkt = rte_pktmbuf_mtod(m, u_char *);
 	Packet *p = (Packet *)(rte_mbuf_to_priv(m));
-	
+
 	PACKET_RECYCLE(p);
 	PKT_SET_SRC(p, PKT_SRC_WIRE);
 
@@ -260,8 +258,9 @@ Packet *DpdkProcessPacket(DpdkThreadVars *ptv, struct rte_mbuf *m)
 	p->dpdk_v.outP = ptv->fwd_portid;
 	p->dpdk_v.inQ = ptv->queueid;
 	p->dpdk_v.outQ = ptv->fwd_queueid;
+	p->dpdk_v.buffer = ptv->txbuffer;
 	/* BYPASS - 0, IDS - 1, IPS - 2*/
-	p->ReleasePacket = (ptv->mode == 1) ? DpdkReleasePacket : DpdkFowardPacket;
+	p->ReleasePacket = (ptv->mode == 1) ? DpdkReleasePacket : (ptv->txbuffer) ? DpdkBufferFowardPacket : DpdkFowardPacket;
 
 	/* we are enabling DPDK PMD to validatte checksum - HW NIC offlaods */
 	p->flags |= ptv->checksumMode;
@@ -306,43 +305,43 @@ TmEcode ReceiveDpdkLoop(ThreadVars *tv, void *data, void *slot)
 		if (likely(ptv->mode != 0)) {
 			if (likely(nb_rx)) {
 
-				for (int i = 0; i < nb_rx; i++) {
-					SCLogDebug("RX-TX in %d rss %u\n", ptv->portid, bufs[i]->hash.rss /*ol_flags & PKT_RX_RSS_HASH*/);
+				int i, ret;
+				for (i = 0; i < 4 && i < nb_rx; i++) {
+					rte_prefetch0(rte_pktmbuf_mtod(bufs[i], void *));
+				}
+
+				for (i = 0; i < (nb_rx - 4); i++) {
+					rte_prefetch0(rte_pktmbuf_mtod(bufs[i + 2], void *));
 					p = DpdkProcessPacket(ptv, bufs[i]);
 
-					if (unlikely(TmThreadsSlotProcessPkt(ptv->tv, ptv->slot, p) != TM_ECODE_OK)) {
+					ret = TmThreadsSlotProcessPkt(ptv->tv, ptv->slot, p);
+					if (unlikely(ret != TM_ECODE_OK)) {
+						ptv->failtx += (uint64_t)1;
 						TmqhOutputPacketpool(ptv->tv, p);
 						SCLogNotice(" failed TmThreadsSlotProcessPkt");
 						SCReturnInt(TM_ECODE_FAILED);
 					}
 				}
 
-#if DPDK-TEST
-				const uint16_t nb_tx = rte_eth_tx_burst(ptv->fwd_portid, ptv->fwd_queueid, bufs, nb_rx);
-				/* Free any unsent packets. */
-				if (unlikely(nb_tx < nb_rx)) {
-					uint16_t buf;
-					/* rte_pktmbuf_free_bulk(bufs, nb_rx); */
-					for (buf = nb_tx; buf < nb_rx; buf++)
-						rte_pktmbuf_free(bufs[buf]);
-					ptv->failtx += (uint64_t)(nb_rx - nb_tx);
+				for (; i < nb_rx; i++) {
+					p = DpdkProcessPacket(ptv, bufs[i]);
+
+					ret = TmThreadsSlotProcessPkt(ptv->tv, ptv->slot, p);
+					if (unlikely(ret != TM_ECODE_OK)) {
+						ptv->failtx += (uint64_t)1;
+						TmqhOutputPacketpool(ptv->tv, p);
+						SCLogNotice(" failed TmThreadsSlotProcessPkt");
+						SCReturnInt(TM_ECODE_FAILED);
+					}
 				}
-#endif
 			}
 			else {
 				ptv->emptyrx += (uint64_t)1;
-				usleep(1);
+				struct timespec tim, tim2;
+				tim.tv_sec = 0;
+				tim.tv_nsec = 100;
+				nanosleep(&tim , &tim2);
 			}
-
-#if 0
-			{
-				now = rte_get_tsc_cycles();
-				if (now - last_packet_time > 100000000) {
-					SendNoOpPacket(ptv->tv, ptv->slot);
-					last_packet_time = now;
-				}
-			}
-#endif
 
 		}
 	}
@@ -380,6 +379,7 @@ TmEcode ReceiveDpdkInit(ThreadVars *tv, void *initdata, void **data)
 	ptv->copy_mode = dpdkconf->copy_mode;
 	ptv->checksumMode = dpdkconf->checksumMode;
 	ptv->promiscous = dpdkconf->promiscous;
+	ptv->txbuffer = dpdkconf->tx_buffer;
 
 	*data = (void *)ptv;
 #endif
@@ -393,6 +393,9 @@ TmEcode ReceiveDpdkDeinit(ThreadVars *tv, void *data)
 {
 	SCEnter();
 	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
+
+	if (ptv->txbuffer)
+		rte_eth_tx_buffer_flush(ptv->fwd_portid, ptv->fwd_portid, ptv->txbuffer);
 
 	/* stop RX queue */
 	rte_free(data);
@@ -454,14 +457,14 @@ TmEcode DecodeDpdkThreadDeinit(ThreadVars *tv, void *data)
 	SCEnter();
 
 #if HAVE_DPDK
-	SCLogNotice(" inside DecodeDpdkThreadDeinit ");
+	SCLogDebug(" inside DecodeDpdkThreadDeinit ");
 
 	DpdkThreadVars *ptv = (DpdkThreadVars *)data;
 
 	if (data != NULL)
 		DecodeThreadVarsFree(tv, data);
 
-	SCLogNotice(" freed data!");
+	SCLogDebug(" freed data!");
 #endif
 
 	SCReturnInt(TM_ECODE_OK);
@@ -483,8 +486,9 @@ TmEcode DecodeDpdk(ThreadVars *tv, Packet *p, void *data, PacketQueue *pq,
     /* update counters */
     DecodeUpdatePacketCounters(tv, dtv, p);
 
-    /* call the decoder */
-    DecodeEthernet(tv, dtv, p, (uint8_t *) rte_pktmbuf_mtod(p->dpdk_v.m, uint8_t *), p->dpdk_v.m->pkt_len, pq);
+	/* call the decoder */
+	DecodeEthernet(tv, dtv, p, (uint8_t *) p->ext_pkt /*rte_pktmbuf_mtod(p->dpdk_v.m, uint8_t *)*/,
+		 p->pktlen /*p->dpdk_v.m->pkt_len*/, pq);
 
     PacketDecodeFinalize(tv, dtv, p);
 

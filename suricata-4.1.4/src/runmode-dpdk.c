@@ -877,14 +877,14 @@ int ParseDpdkYaml(void)
 							dpdk_ports[i].rxq_count = atoi(val_fld[1]);
 							dpdk_ports[i].txq_count = atoi(val_fld[1]) + 1;
 						}
-					} else
-					if (strcasecmp("mtu", val_fld[0]) == 0)
+					}
+					else if (strcasecmp("tx-mode", val_fld[0]) == 0)
+							dpdk_ports[i].tx_buffer = atoi(val_fld[1]);
+					else if (strcasecmp("mtu", val_fld[0]) == 0)
 							dpdk_ports[i].mtu = atoi(val_fld[1]);
-					else
-					if (strcasecmp("rss-tuple", val_fld[0]) == 0)
+					else if (strcasecmp("rss-tuple", val_fld[0]) == 0)
 							dpdk_ports[i].rss_tuple = atoi(val_fld[1]);
-					else
-					if (strcasecmp("jumbo", val_fld[0]) == 0)
+					else if (strcasecmp("jumbo", val_fld[0]) == 0)
 							dpdk_ports[i].jumbo = !strcasecmp(val_fld[1], "yes");
 				}
 			}
@@ -999,13 +999,13 @@ static void *DpdkConfigParser(const char *device)
 
 	snprintf(config->in_iface, DPDK_ETH_NAME_SIZE, "unknown-in-%u", config->portid);
 	if (rte_eth_dev_get_name_by_port(config->portid, config->in_iface) != 0) {
-			SCLogError(SC_ERR_DPDK_CONFIG, " failed to get_name of port-%u\n", config->portid);
+			SCLogError(SC_ERR_DPDK_CONFIG, " failed to get_name of in port-%u\n", config->portid);
 			exit(EXIT_FAILURE);
 	}
 
 	snprintf(config->out_iface, DPDK_ETH_NAME_SIZE, "unknown-out-%u", config->fwd_portid);
 	if (rte_eth_dev_get_name_by_port(config->fwd_portid, config->out_iface) != 0) {
-			SCLogError(SC_ERR_DPDK_CONFIG, " failed to get_name of port-%u\n", config->fwd_portid);
+			SCLogError(SC_ERR_DPDK_CONFIG, " failed to get_name of out port-%u\n", config->fwd_portid);
 			exit(EXIT_FAILURE);
 	}
 
@@ -1017,6 +1017,21 @@ static void *DpdkConfigParser(const char *device)
 
 	config->flags = 0; /* what should be flags here? */
 	config->copy_mode = 0; /* need to check from suricata IPS/IDS/BYPASS */
+
+	if (dpdk_ports[config->portid].tx_buffer) {
+		config->tx_buffer = rte_zmalloc_socket("tx_buffer",
+			 RTE_ETH_TX_BUFFER_SIZE((dpdk_ports[config->portid].tx_buffer == 0x01) ? 4 : (dpdk_ports[config->portid].tx_buffer == 0x01) ? 8 : 16),
+			 0, rte_eth_dev_socket_id(config->portid));
+		if (config->tx_buffer == NULL) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " failed to allocate tx_buffer memory for port (%u)", config->portid);
+			exit(EXIT_FAILURE);
+		}
+
+		if (rte_eth_tx_buffer_init(config->tx_buffer, (dpdk_ports[config->portid].tx_buffer == 0x01) ? 4 : (dpdk_ports[config->portid].tx_buffer == 0x01) ? 8 : 16) != 0) {
+			SCLogError(SC_ERR_DPDK_CONFIG, " failed to initialize tx_buffer for port (%u)", config->portid);
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	SCLogDebug(" in (%s, %u, %u) out (%s, %u, %u) checksum %x",
 		config->in_iface, config->portid, config->queueid,
@@ -1221,6 +1236,7 @@ static void ListDpdkConfig(void)
 		SCLogDebug(" - mtu (%u)", dpdk_ports[i].mtu);
 		SCLogDebug(" - rss (%u)", dpdk_ports[i].rss_tuple);
 		SCLogDebug(" - jumbo (%u)", dpdk_ports[i].jumbo);
+		SCLogDebug(" - tx_buffer (%u)", dpdk_ports[i].tx_buffer);
 		SCLogDebug(" ");
 	}
 

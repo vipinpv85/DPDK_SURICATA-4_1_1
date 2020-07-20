@@ -45,8 +45,10 @@ typedef struct __attribute__((__packed__))
 	uint8_t rxq_count;
 	uint8_t txq_count;
 	uint16_t mtu;
+	uint8_t tx_buffer:3;
 	uint8_t rss_tuple:2;
 	uint8_t jumbo:1;
+	uint8_t resv:2;
 } DpdkPortConfig_t;
 
 typedef struct __attribute__((__packed__))

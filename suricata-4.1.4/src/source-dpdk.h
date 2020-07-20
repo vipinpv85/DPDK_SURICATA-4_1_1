@@ -65,25 +65,27 @@ typedef struct DpdkIfaceConfig
 	uint16_t fwd_portid;
 	uint16_t fwd_queueid;
 
-    /* ring size in number of packets */
-    int ringSize;
-    int ringBufferId;
-    
-    uint8_t checksumMode;
-    uint8_t promiscous;
+	struct rte_eth_dev_tx_buffer *tx_buffer;
 
-    /* cluster param */
-    int cluster_id;
-    int cluster_type;
-
-    /* misc use flags including ring mode */
-    int flags;
-    int copy_mode;
-
-    char *bpfFilter;
-    char *outIface;
-
-    //SC_ATOMIC_DECLARE(unsigned int, ref);
+	/* ring size in number of packets */
+	int ringSize;
+	int ringBufferId;
+	
+	uint8_t checksumMode;
+	uint8_t promiscous;
+	
+	/* cluster param */
+	int cluster_id;
+	int cluster_type;
+	
+	/* misc use flags including ring mode */
+	int flags;
+	int copy_mode;
+	
+	char *bpfFilter;
+	char *outIface;
+	
+	//SC_ATOMIC_DECLARE(unsigned int, ref);
 } DpdkIfaceConfig_t;
 
 typedef struct DpdkPacketVars_s
@@ -94,6 +96,7 @@ typedef struct DpdkPacketVars_s
 	uint16_t outQ;
 
 	struct rte_mbuf *m;
+	struct rte_eth_dev_tx_buffer *buffer;
 } DpdkPacketVars;
 
 
