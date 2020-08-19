@@ -1172,8 +1172,8 @@ EXTRA_DIST = tests
 AM_CPPFLAGS = $(all_includes)
 
 # the library search path.
-suricata_LDFLAGS = $(all_libraries) ${SECLDFLAGS}
-suricata_LDADD = $(HTP_LDADD) $(RUST_LDADD) ${DPDK_LDFLAGS}
+suricata_LDFLAGS = $(all_libraries) ${SECLDFLAGS} ${DPDK_LDFLAGS}
+suricata_LDADD = $(HTP_LDADD) $(RUST_LDADD)
 @HAVE_RUST_TRUE@suricata_DEPENDENCIES = $(RUST_SURICATA_LIB)
 
 # default CFLAGS
