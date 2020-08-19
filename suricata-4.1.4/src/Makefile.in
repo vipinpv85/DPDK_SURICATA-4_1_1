@@ -308,11 +308,12 @@ am_suricata_OBJECTS = alert-debuglog.$(OBJEXT) alert-fastlog.$(OBJEXT) \
 	source-pcap.$(OBJEXT) source-pcap-file.$(OBJEXT) \
 	source-pcap-file-directory-helper.$(OBJEXT) \
 	source-pcap-file-helper.$(OBJEXT) source-pfring.$(OBJEXT) \
-	source-windivert.$(OBJEXT) stream.$(OBJEXT) \
-	stream-tcp.$(OBJEXT) stream-tcp-inline.$(OBJEXT) \
-	stream-tcp-list.$(OBJEXT) stream-tcp-reassemble.$(OBJEXT) \
-	stream-tcp-sack.$(OBJEXT) stream-tcp-util.$(OBJEXT) \
-	suricata.$(OBJEXT) threads.$(OBJEXT) tm-modules.$(OBJEXT) \
+	source-windivert.$(OBJEXT) source-dpdk.$(OBJEXT) \
+	stream.$(OBJEXT) stream-tcp.$(OBJEXT) \
+	stream-tcp-inline.$(OBJEXT) stream-tcp-list.$(OBJEXT) \
+	stream-tcp-reassemble.$(OBJEXT) stream-tcp-sack.$(OBJEXT) \
+	stream-tcp-util.$(OBJEXT) suricata.$(OBJEXT) \
+	threads.$(OBJEXT) tm-modules.$(OBJEXT) \
 	tmqh-flow.$(OBJEXT) tmqh-nfq.$(OBJEXT) \
 	tmqh-packetpool.$(OBJEXT) tmqh-simple.$(OBJEXT) \
 	tm-queuehandlers.$(OBJEXT) tm-queues.$(OBJEXT) \
@@ -1028,6 +1029,7 @@ source-pcap-file-directory-helper.c source-pcap-file-directory-helper.h \
 source-pcap-file-helper.c source-pcap-file-helper.h \
 source-pfring.c source-pfring.h \
 source-windivert.c source-windivert.h \
+source-dpdk.c source-dpdk.h \
 stream.c stream.h \
 stream-tcp.c stream-tcp.h stream-tcp-private.h \
 stream-tcp-inline.c stream-tcp-inline.h \
@@ -1649,6 +1651,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/source-pcap.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/source-pfring.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/source-windivert.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/source-dpdk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stream-tcp-inline.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stream-tcp-list.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stream-tcp-reassemble.Po@am__quote@
