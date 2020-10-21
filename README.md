@@ -1,6 +1,7 @@
 # DPDK_SURICATA-4_1_4
 
-porting ACL from 3.0 - work in progress
+porting ACL from 3.0 - on hold
+`creating patch request for dev branch of Suricata 6.0`
 
 ## Motivation
 
