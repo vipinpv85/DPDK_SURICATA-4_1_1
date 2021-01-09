@@ -1348,27 +1348,29 @@
             AC_SUBST(DPDK_CFLAGS)
             echo " Added configuration for DPDK CFLAGS"
 
-            DPDK_LDFLAGS=" -D_GNU_SOURCE -pthread -Wl,--no-as-needed -Wl,-export-dynamic -L${RTE_SDK}/${RTE_TARGET}/lib/ -Wl,-lrte_flow_classify -Wl,-lrte_pipeline -Wl,-lrte_table -Wl,-lrte_port -Wl,-lrte_pdump -Wl,-lrte_distributor -Wl,-lrte_ip_frag -Wl,-lrte_gro -Wl,-lrte_gso -Wl,-lrte_meter -Wl,-lrte_lpm -Wl,--whole-archive -Wl,-lrte_acl -Wl,--no-whole-archive -Wl,-lrte_jobstats -Wl,-lrte_metrics -Wl,-lrte_bitratestats -Wl,-lrte_latencystats -Wl,-lrte_power -Wl,-lrte_timer -Wl,-lrte_efd -Wl,--whole-archive -Wl,-lrte_cfgfile -Wl,-lrte_hash -Wl,-lrte_member -Wl,-lrte_vhost -Wl,-lrte_kvargs -Wl,-lrte_mbuf -Wl,-lrte_net -Wl,-lrte_ethdev -Wl,-lrte_cryptodev -Wl,-lrte_security -Wl,-lrte_eventdev -Wl,-lrte_mempool -Wl,-lrte_mempool_ring -Wl,-lrte_ring -Wl,-lrte_pci -Wl,-lrte_eal -Wl,-lrte_cmdline -Wl,-lrte_reorder -Wl,-lrte_sched -Wl,-lrte_kni -Wl,-lrte_bus_pci -Wl,-lrte_bus_vdev -Wl,-lrte_mempool_stack -Wl,-lrte_pmd_af_packet -Wl,-lrte_pmd_bond -Wl,-lrte_pmd_e1000 -Wl,-lrte_pmd_failsafe -Wl,-lrte_pmd_i40e -Wl,-lrte_pmd_ixgbe -Wl,-lrte_pmd_kni -Wl,-lrte_pmd_null -Wl,-lrte_pmd_ring -Wl,-lrte_pmd_softnic -Wl,-lrte_pmd_tap -Wl,-lrte_pmd_virtio -Wl,-lrte_pmd_vhost -Wl,-lrte_pmd_null_crypto -Wl,-lrte_pmd_crypto_scheduler -Wl,-lrte_pmd_skeleton_event -Wl,-lrte_pmd_sw_event -Wl,--no-whole-archive -Wl,-lrt -Wl,-lm -Wl,-lnuma -Wl,-ldl -Wl,-export-dynamic -Wl,--as-needed -Wl, ${RTE_SDK}/${RTE_TARGET}/lib/libdpdk.a "
             DPDK_LDFLAGS="-I$RTE_SDK/lib/librte_eal/linux/eal/include \
 -DRTE_USE_FUNCTION_VERSIONING \
 -I$RTE_SDK/$RTE_TARGET/include -include $RTE_SDK/$RTE_TARGET/include/rte_config.h \
 -D_GNU_SOURCE  -W -Wall  -DALLOW_EXPERIMENTAL_API  \
--L$RTE_SDK/$RTE_TARGET/lib -Wl,-lrte_flow_classify -Wl,--whole-archive -Wl,-lrte_pipeline -Wl,--no-whole-archive -Wl,\
---whole-archive -Wl,-lrte_table -Wl,--no-whole-archive -Wl,--whole-archive -Wl,-lrte_port -Wl,--no-whole-archive -Wl,\
--lrte_pdump -Wl,-lrte_ip_frag -Wl,-lrte_meter -Wl,-lrte_fib -Wl,-lrte_rib -Wl,-lrte_lpm -Wl,\
--lrte_acl -Wl,-lrte_power -Wl,-lrte_kni -Wl,\
--lrte_efd -Wl,-lrte_bpf -Wl,-lrte_ipsec -Wl,--whole-archive -Wl,-lrte_cfgfile -Wl,-lrte_gro -Wl,-lrte_gso -Wl,\
--lrte_hash -Wl,-lrte_member -Wl,-lrte_vhost -Wl,-lrte_kvargs -Wl,-lrte_mbuf -Wl,-lrte_net -Wl,-lrte_ethdev -Wl,\
--lrte_cryptodev -Wl,-lrte_security -Wl,-lrte_compressdev -Wl,-lrte_eventdev -Wl,\
--lrte_timer -Wl,-lrte_mempool -Wl,-lrte_stack -Wl,-lrte_mempool_ring -Wl,-lrte_ring -Wl,\
--lrte_pci -Wl,-lrte_eal -Wl,-lrte_cmdline -Wl,-lrte_reorder -Wl,-lrte_sched -Wl,-lrte_rcu -Wl,\
--lrte_bus_pci -Wl,-lrte_bus_vdev -Wl,\
--lrte_mempool_bucket -Wl,-lrte_mempool_stack -Wl,-lrte_pmd_af_packet -Wl,\
--lrte_pmd_i40e -Wl,-lrte_pmd_memif -Wl,-lrte_pmd_null -Wl,\
--lpcap -Wl,-lrte_pmd_ring -Wl,-lrte_pmd_tap -Wl,-lrte_pmd_virtio -Wl,-lrte_bus_vmbus -Wl,-lcrypto -Wl,\
--lrte_pmd_null_crypto -Wl,-lrte_pmd_crypto_scheduler -Wl,-lrte_pmd_virtio_crypto -Wl,-lrte_pmd_skeleton_event -Wl,\
--lrte_pmd_sw_event -Wl,--no-whole-archive -Wl,-lrt -Wl,-lm -Wl,-lnuma -Wl,-ldl -Wl,-export-dynamic -Wl,\
--export-dynamic -L$RTE_SDK/examples/l2fwd/build/lib -L$RTE_SDK/$RTE_TARGET/lib -Wl,--as-needed"
+-L$RTE_SDK/$RTE_TARGET/lib -Wl,-lrte_flow_classify -Wl,--whole-archive -Wl,-lrte_pipeline -Wl,--no-whole-archive \
+-Wl,--whole-archive -Wl,-lrte_table -Wl,--no-whole-archive -Wl,--whole-archive \
+-Wl,-lrte_port -Wl,--no-whole-archive -Wl,-lrte_pdump -Wl,-lrte_ip_frag -Wl,-lrte_meter \
+-Wl,-lrte_fib -Wl,-lrte_rib -Wl,-lrte_lpm -Wl,-lrte_acl -Wl,-lrte_power -Wl,-lrte_kni \
+-Wl,-lrte_efd -Wl,-lrte_bpf -Wl,-lrte_ipsec -Wl,--whole-archive -Wl,-lrte_cfgfile -Wl,-lrte_gro \
+-Wl,-lrte_gso -Wl,-lrte_hash -Wl,-lrte_member -Wl,-lrte_vhost -Wl,-lrte_kvargs -Wl,-lrte_mbuf \
+-Wl,-lrte_net -Wl,-lrte_ethdev -Wl,-lrte_cryptodev -Wl,-lrte_security -Wl,-lrte_compressdev \
+-Wl,-lrte_eventdev -Wl,-lrte_timer -Wl,-lrte_mempool -Wl,-lrte_stack -Wl,-lrte_mempool_ring \
+-Wl,-lrte_ring -Wl,-lrte_pci -Wl,-lrte_eal -Wl,-lrte_cmdline -Wl,-lrte_reorder -Wl,-lrte_sched \
+-Wl,-lrte_rcu -Wl,-lrte_bus_pci -Wl,-lrte_bus_vdev -Wl,-lrte_mempool_bucket -Wl,-lrte_mempool_stack \
+-Wl,-lrte_pmd_af_packet \
+-Wl,-lrte_pmd_i40e \
+-Wl,-lrte_pmd_memif \
+-Wl,-lrte_pmd_null \
+-Wl,-lpcap -Wl,-lrte_pmd_ring -Wl,-lrte_pmd_tap -Wl,-lrte_pmd_virtio -Wl,-lrte_bus_vmbus \
+-Wl,-lcrypto -Wl,-lrte_pmd_null_crypto -Wl,-lrte_pmd_crypto_scheduler -Wl,-lrte_pmd_virtio_crypto \
+-Wl,-lrte_pmd_skeleton_event -Wl,-lrte_pmd_sw_event \
+-Wl,--no-whole-archive -Wl,-lrt -Wl,-lm -Wl,-lnuma -Wl,-ldl -Wl,-export-dynamic -Wl,-export-dynamic \
+-L$RTE_SDK/examples/l2fwd/build/lib -L$RTE_SDK/$RTE_TARGET/lib -Wl,--as-needed"
             echo " Added configuration for DPDK LDFLAGS"
             AC_SUBST(DPDK_LDFLAGS)
         fi

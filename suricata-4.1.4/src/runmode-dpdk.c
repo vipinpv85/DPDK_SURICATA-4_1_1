@@ -811,7 +811,7 @@ int ParseDpdkYaml(void)
 	dpdk_config.rx_reassemble = 0;
 	dpdk_config.tx_fragment = 0;
 
-	int boolvalue = 0;
+	int boolvalue = 0, txbuffer_value = 0;
 	intmax_t aclvalue = 0;
 
 	if (ConfGetChildValueBool(node, "pre-acl", &boolvalue) == 1)
@@ -826,6 +826,7 @@ int ParseDpdkYaml(void)
 		dpdk_acl_config.acl4_rules = aclvalue;
 	if (ConfGetChildValueInt(node, "ipv6-preacl", &aclvalue) == 1)
 		dpdk_acl_config.acl6_rules = aclvalue;
+	ConfGetChildValueBool(node, "tx-buffer", &txbuffer_value);
 
 	dpdk_config.mode = 1; /* default IDS */
 	const char *mode = ConfNodeLookupChildValue(node, "mode");
@@ -870,16 +871,16 @@ int ParseDpdkYaml(void)
 		if (Node) {
 			TAILQ_FOREACH(sub_node, &Node->head, next) {
 			if (sub_node->val) {
-				char *val_fld[2];
+				char *val_fld[2] = {NULL};
 
 				if (rte_strsplit(sub_node->val, sizeof(sub_node->val), val_fld, 2, '=') == 2) {
+					dpdk_ports[i].tx_buffer = txbuffer_value;
+
 					if (strcasecmp("queues", val_fld[0]) == 0) {
 							dpdk_ports[i].rxq_count = atoi(val_fld[1]);
 							dpdk_ports[i].txq_count = atoi(val_fld[1]) + 1;
 						}
 					}
-					else if (strcasecmp("tx-mode", val_fld[0]) == 0)
-							dpdk_ports[i].tx_buffer = atoi(val_fld[1]);
 					else if (strcasecmp("mtu", val_fld[0]) == 0)
 							dpdk_ports[i].mtu = atoi(val_fld[1]);
 					else if (strcasecmp("rss-tuple", val_fld[0]) == 0)
@@ -1020,17 +1021,24 @@ static void *DpdkConfigParser(const char *device)
 
 	if (dpdk_ports[config->portid].tx_buffer) {
 		config->tx_buffer = rte_zmalloc_socket("tx_buffer",
-			 RTE_ETH_TX_BUFFER_SIZE((dpdk_ports[config->portid].tx_buffer == 0x01) ? 4 : (dpdk_ports[config->portid].tx_buffer == 0x01) ? 8 : 16),
+			 RTE_ETH_TX_BUFFER_SIZE((dpdk_ports[config->portid].tx_buffer == 0x01) ? 4 : (dpdk_ports[config->portid].tx_buffer == 0x01) ? 8 : 32),
 			 0, rte_eth_dev_socket_id(config->portid));
 		if (config->tx_buffer == NULL) {
 			SCLogError(SC_ERR_DPDK_CONFIG, " failed to allocate tx_buffer memory for port (%u)", config->portid);
 			exit(EXIT_FAILURE);
 		}
 
-		if (rte_eth_tx_buffer_init(config->tx_buffer, (dpdk_ports[config->portid].tx_buffer == 0x01) ? 4 : (dpdk_ports[config->portid].tx_buffer == 0x01) ? 8 : 16) != 0) {
+		if (rte_eth_tx_buffer_init(config->tx_buffer,
+			 (dpdk_ports[config->portid].tx_buffer == 0x01) ? 4 :
+			 (dpdk_ports[config->portid].tx_buffer == 0x01) ? 8 : 32) != 0) {
 			SCLogError(SC_ERR_DPDK_CONFIG, " failed to initialize tx_buffer for port (%u)", config->portid);
 			exit(EXIT_FAILURE);
 		}
+
+#if 0
+		if (rte_eth_tx_buffer_set_err_callback(config->tx_buffer, rte_eth_tx_buffer_count_callback, &dpdk_ports[config->portid].tx_buff_drop) != 0)
+			rte_exit(EXIT_FAILURE, "Cannot set error callback for tx buffer on port %u\n", config->portid);
+#endif
 	}
 
 	SCLogDebug(" in (%s, %u, %u) out (%s, %u, %u) checksum %x",
