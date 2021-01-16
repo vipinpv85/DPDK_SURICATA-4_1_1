@@ -29,7 +29,7 @@
  */
 
 //#include "dpdk-include-common.h"
-
+#include <config.h>
 #ifdef HAVE_DPDK
 #include <rte_common.h>
 #include <rte_byteorder.h>
