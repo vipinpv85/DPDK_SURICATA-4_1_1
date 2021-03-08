@@ -1013,7 +1013,7 @@ static void *DpdkConfigParser(const char *device)
 	config->promiscous = 1;
 	config->checksumMode =
 		(dev_info.default_rxconf.offloads & DEV_RX_OFFLOAD_CHECKSUM) ?
-		CHECKSUM_VALIDATION_DISABLE : CHECKSUM_VALIDATION_RXONLY;
+		CHECKSUM_VALIDATION_RXONLY : CHECKSUM_VALIDATION_DISABLE;
 	config->bpfFilter = NULL;
 
 	config->flags = 0; /* what should be flags here? */
