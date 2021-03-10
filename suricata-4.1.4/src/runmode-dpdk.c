@@ -857,7 +857,7 @@ int ParseDpdkYaml(void)
 						dpdk_mempool_config.private_data_size = atoi(val_fld[1]);
 					else
 					if (strncasecmp("socket_id", val_fld[0], strlen("socket_id")) == 0)
-						dpdk_mempool_config.private_data_size = atoi(val_fld[1]);
+						dpdk_mempool_config.socket_id = atoi(val_fld[1]);
 				}
 			}
 		}
